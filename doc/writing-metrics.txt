@@ -1,0 +1,638 @@
+*writing-metrics.txt*  Writing metrics and readability analysis for Neovim
+
+==============================================================================
+CONTENTS                                          *writing-metrics-contents*
+
+1. Introduction ..................... |writing-metrics-introduction|
+2. Requirements ..................... |writing-metrics-requirements|
+3. Installation ..................... |writing-metrics-installation|
+4. Quick Start ...................... |writing-metrics-quickstart|
+5. Commands ......................... |writing-metrics-commands|
+6. Configuration .................... |writing-metrics-config|
+7. API .............................. |writing-metrics-api|
+8. Readability Formulas ............. |writing-metrics-formulas|
+9. Advanced Features ................ |writing-metrics-advanced|
+10. Statusline Integration .......... |writing-metrics-statusline|
+11. Troubleshooting ................. |writing-metrics-troubleshooting|
+12. About ........................... |writing-metrics-about|
+
+==============================================================================
+INTRODUCTION                              *writing-metrics-introduction*
+
+nvim-writing-metrics provides comprehensive writing analysis for prose
+documents. It calculates basic metrics (word count, character count,
+sentence count) and advanced readability formulas to help writers assess
+and improve their work.
+
+Features:
+  " Basic metrics: words, characters, sentences, paragraphs
+  " 6 readability formulas (Coleman-Liau, ARI, Flesch, etc.)
+  " Sentence variety analysis with pattern detection
+  " Passive voice and nominalization detection
+  " AI-style detection (80+ AI-associated words)
+  " Intelligent caching for performance
+  " Statusline integration
+  " Async execution (non-blocking)
+
+Designed for writers working on:
+  " Grant proposals (NIH, NSF, etc.)
+  " Creative writing (fiction, poetry, essays)
+  " Academic papers and research
+  " Professional documentation
+
+==============================================================================
+REQUIREMENTS                              *writing-metrics-requirements*
+
+Required:
+  " Neovim >= 0.10
+  " Pandoc >= 2.19 (for text analysis)
+  " snacks.nvim >= 2.0 (for UI components)
+  " Unix-like system (Linux, macOS, WSL)
+
+Optional:
+  " lualine.nvim or heirline.nvim (for statusline integration)
+
+To check if Pandoc is installed: >
+    :!pandoc --version
+<
+
+To install Pandoc:
+  " Arch Linux:     `sudo pacman -S pandoc`
+  " Ubuntu/Debian:  `sudo apt install pandoc`
+  " macOS:          `brew install pandoc`
+
+==============================================================================
+INSTALLATION                              *writing-metrics-installation*
+
+Using lazy.nvim: >lua
+    {
+      "jkeim/nvim-writing-metrics",
+      dependencies = { "folke/snacks.nvim" },
+      ft = { "markdown", "text", "tex", "org" },
+      opts = {},
+      keys = {
+        { "<leader>mc", "<cmd>WordCount<cr>", desc = "Word count" },
+        { "<leader>mr", "<cmd>ReadabilityReport<cr>", desc = "Readability" },
+      },
+    }
+<
+
+Using packer.nvim: >lua
+    use {
+      "jkeim/nvim-writing-metrics",
+      requires = { "folke/snacks.nvim" },
+      ft = { "markdown", "text", "tex", "org" },
+      config = function()
+        require("writing-metrics").setup({})
+      end,
+    }
+<
+
+==============================================================================
+QUICK START                                   *writing-metrics-quickstart*
+
+1. Open a writing file (markdown, text, etc.)
+2. Press <leader>mc to see basic word count
+3. Press <leader>mr for comprehensive readability report
+
+Suggested keybindings: >lua
+    vim.keymap.set("n", "<leader>mc", "<cmd>WordCount<cr>")
+    vim.keymap.set("n", "<leader>mr", "<cmd>ReadabilityReport<cr>")
+    vim.keymap.set("n", "<leader>mt", "<cmd>WritingMetricsToggle<cr>")
+<
+
+==============================================================================
+COMMANDS                                      *writing-metrics-commands*
+
+                                                             *:WordCount*
+:WordCount
+    Show basic metrics in a floating window:
+      " Word count
+      " Character count (with and without spaces)
+      " Sentence count
+      " Paragraph count
+      " Average words per sentence
+      " Average characters per word
+      " Average sentences per paragraph
+
+    Results are cached for 500ms by default.
+
+                                                      *:ReadabilityReport*
+:ReadabilityReport [{context}]
+    Open comprehensive readability analysis in a new tab:
+      " All basic metrics
+      " 6 readability formulas with interpretation
+      " Sentence variety analysis
+      " Monotonous pattern detection
+      " Passive voice percentage
+      " Nominalization count
+      " Vocabulary richness (type-token ratio)
+      " AI-style detection
+
+    Optional {context} argument for target thresholds:
+      " grant_writing
+      " creative_writing
+      " academic_writing
+
+    Examples: >
+        :ReadabilityReport
+        :ReadabilityReport grant_writing
+        :ReadabilityReport creative_writing
+<
+
+    Results are cached for 30 seconds by default.
+    Press 'q' to close the report buffer.
+
+                                                  *:WritingMetricsToggle*
+:WritingMetricsToggle
+    Toggle between fast and accurate word count modes.
+
+    " Fast mode: Uses Vim's built-in word counting (instant)
+    " Accurate mode: Uses Pandoc for precise analysis (slight delay)
+
+    Useful for large files where you want instant feedback vs.
+    when you need precise metrics for submission.
+
+                                                   *:WritingMetricsCache*
+:WritingMetricsCache
+    Show cache statistics for current buffer:
+      " Cache age
+      " Cache hit/miss count
+      " Cached metrics
+
+    Provides option to clear cache for current buffer.
+
+==============================================================================
+CONFIGURATION                                  *writing-metrics-config*
+
+Default configuration: >lua
+    require("writing-metrics").setup({
+      -- Cache TTL in milliseconds
+      cache_ttl_statusline = 500,    -- Statusline cache
+      cache_ttl_reports = 30000,     -- Report cache (30 seconds)
+
+      -- Feature flags
+      enable_statusline = true,      -- Enable statusline component
+      enable_readability = true,     -- Enable readability formulas
+      enable_advanced = true,        -- Enable advanced analysis
+
+      -- Pandoc configuration
+      pandoc_cmd = "pandoc",         -- Pandoc executable
+      filter_path = nil,             -- Auto-detected
+
+      -- File type configuration
+      filetypes = {
+        "markdown", "text", "tex", "org", "asciidoc",
+      },
+
+      -- Display configuration
+      float_opts = {
+        border = "rounded",
+        relative = "cursor",
+        width = 50,
+        height = 10,
+      },
+
+      report_opts = {
+        filetype = "markdown",
+        modifiable = false,
+      },
+
+      -- Target thresholds (optional)
+      targets = {
+        grant_writing = {
+          flesch_kincaid = { min = 10, max = 12 },
+          gunning_fog = { min = 10, max = 14 },
+          ai_words = { max = 0 },
+        },
+      },
+    })
+<
+
+Configuration options:
+
+                                        *writing-metrics-config-cache-ttl*
+cache_ttl_statusline~
+    Number. Cache time-to-live for statusline in milliseconds.
+    Default: 500
+
+    Recommendations:
+      " Large files (10K+ words): 1000-2000ms
+      " Small files (< 1K words): 100-200ms
+
+cache_ttl_reports~
+    Number. Cache time-to-live for reports in milliseconds.
+    Default: 30000 (30 seconds)
+
+    Increase for very large files to reduce recalculation frequency.
+
+                                        *writing-metrics-config-features*
+enable_statusline~
+    Boolean. Enable statusline integration.
+    Default: true
+
+enable_readability~
+    Boolean. Enable readability formulas.
+    Set to false to only calculate basic metrics.
+    Default: true
+
+enable_advanced~
+    Boolean. Enable advanced analysis (passive voice, nominalization,
+    AI detection).
+    Default: true
+
+                                         *writing-metrics-config-pandoc*
+pandoc_cmd~
+    String. Name or full path to Pandoc executable.
+    Default: "pandoc"
+
+    Example: >lua
+        pandoc_cmd = "/usr/local/bin/pandoc"
+<
+
+filter_path~
+    String or nil. Path to textmetrics.lua Pandoc filter.
+    Default: nil (auto-detected: ~/.local/bin/textmetrics.lua)
+
+    Example: >lua
+        filter_path = "/path/to/custom/textmetrics.lua"
+<
+
+                                      *writing-metrics-config-filetypes*
+filetypes~
+    Table. List of file types to analyze.
+    Default: { "markdown", "text", "tex", "org", "asciidoc" }
+
+    Add custom file types: >lua
+        filetypes = { "markdown", "text", "tex", "fountain" }
+<
+
+                                        *writing-metrics-config-display*
+float_opts~
+    Table. Options for floating window (:WordCount).
+    See |api-floatwin| for available options.
+
+report_opts~
+    Table. Options for report buffer (:ReadabilityReport).
+
+                                        *writing-metrics-config-targets*
+targets~
+    Table. Target threshold ranges for different writing contexts.
+    Used to highlight metrics that fall outside target ranges.
+
+    Example: >lua
+        targets = {
+          grant_writing = {
+            flesch_kincaid = { min = 10, max = 12 },
+            gunning_fog = { min = 10, max = 14 },
+            ai_words = { max = 0 },
+            passive_voice_percent = { max = 5 },
+          },
+          creative_writing = {
+            sentence_variety_cv = { min = 50 },
+            flesch_reading_ease = { min = 60, max = 80 },
+          },
+        }
+<
+
+==============================================================================
+API                                                *writing-metrics-api*
+
+Lua API for programmatic access to metrics.
+
+                                              *writing-metrics.get_metrics*
+get_metrics()
+    Get cached metrics for current buffer.
+
+    Returns: ~
+        Table with metrics data:
+          " words (number)
+          " chars (number)
+          " chars_no_spaces (number)
+          " sentences (number)
+          " paragraphs (number)
+          " avg_words_per_sentence (number)
+          " avg_chars_per_word (number)
+          " avg_sentences_per_paragraph (number)
+          " flesch_reading_ease (number, if readability enabled)
+          " flesch_kincaid (number, if readability enabled)
+          " ... (other metrics)
+
+    Example: >lua
+        local metrics = require("writing-metrics")
+        local data = metrics.get_metrics()
+        print("Words:", data.words)
+<
+
+                                        *writing-metrics.get_metrics_async*
+get_metrics_async({callback})
+    Get metrics asynchronously, bypassing cache.
+
+    Parameters: ~
+        {callback}  Function called with metrics data when ready.
+
+    Example: >lua
+        local metrics = require("writing-metrics")
+        metrics.get_metrics_async(function(data)
+          print("Words:", data.words)
+        end)
+<
+
+                                        *writing-metrics.is_writing_buffer*
+is_writing_buffer()
+    Check if current buffer is a writing file type.
+
+    Returns: ~
+        Boolean. True if buffer should be analyzed.
+
+    Example: >lua
+        local metrics = require("writing-metrics")
+        if metrics.is_writing_buffer() then
+          print("This is a writing buffer")
+        end
+<
+
+                                  *writing-metrics.get_statusline_component*
+get_statusline_component()
+    Get formatted string for statusline display.
+
+    Returns: ~
+        String with word and character count, or empty string if not
+        a writing buffer.
+
+    Example: >lua
+        local metrics = require("writing-metrics")
+        local statusline_text = metrics.get_statusline_component()
+        -- Returns: "Å  1,247 words  Ç6 7,892 chars"
+<
+
+                                              *writing-metrics.clear_cache*
+clear_cache()
+    Clear cached metrics for current buffer.
+
+    Example: >lua
+        require("writing-metrics").clear_cache()
+<
+
+                                        *writing-metrics.clear_all_caches*
+clear_all_caches()
+    Clear cached metrics for all buffers.
+
+    Example: >lua
+        require("writing-metrics").clear_all_caches()
+<
+
+==============================================================================
+READABILITY FORMULAS                          *writing-metrics-formulas*
+
+The plugin calculates 6 readability formulas:
+
+Coleman-Liau Index                     *writing-metrics-formula-coleman*
+    Grade level based on letter count and sentence length.
+    Does not require syllable counting (fast).
+    Range: 1-16+ (US grade level)
+
+Automated Readability Index (ARI)      *writing-metrics-formula-ari*
+    Grade level based on character-to-word ratio.
+    Does not require syllable counting (fast).
+    Range: 1-16+ (US grade level)
+
+Flesch Reading Ease                    *writing-metrics-formula-flesch*
+    General readability score (higher = easier).
+    Requires syllable counting (comprehensive).
+    Range: 0-100
+      90-100: Very easy (5th grade)
+      80-89:  Easy (6th grade)
+      70-79:  Fairly easy (7th grade)
+      60-69:  Standard (8th-9th grade)
+      50-59:  Fairly difficult (10th-12th grade)
+      30-49:  Difficult (college)
+      0-29:   Very difficult (graduate)
+
+Flesch-Kincaid Grade Level             *writing-metrics-formula-fk*
+    US grade level required to understand text.
+    Requires syllable counting (comprehensive).
+    Range: 1-16+
+      8.0:  8th grade
+      12.0: High school senior
+      16.0: College graduate
+
+Gunning Fog Index                      *writing-metrics-formula-fog*
+    Years of formal education needed.
+    Emphasizes complex (polysyllabic) words.
+    Range: 6-20+
+      12: High school senior
+      16: College graduate
+      20+: Graduate level
+
+SMOG Index                             *writing-metrics-formula-smog*
+    Simple Measure of Gobbledygook.
+    Conservative estimate (often higher than other formulas).
+    Focuses on polysyllabic words.
+    Range: 6-20+ (years of education)
+
+Interpreting results:
+
+For grant proposals:
+  " Flesch-Kincaid: 10-12 (clear but professional)
+  " Gunning Fog: 10-14
+  " Avoid AI-associated words
+
+For creative writing:
+  " Flesch Reading Ease: 60-80 (engaging)
+  " High sentence variety (CV > 50%)
+
+For academic writing:
+  " Flesch-Kincaid: 12-16 (appropriate complexity)
+  " Low passive voice (< 10%)
+
+==============================================================================
+ADVANCED FEATURES                            *writing-metrics-advanced*
+
+Sentence Variety Analysis          *writing-metrics-sentence-variety*
+    Analyzes sentence length variability:
+      " Standard deviation of sentence lengths
+      " Coefficient of variation (CV)
+      " Distribution histogram
+      " Monotonous pattern detection
+
+    Interpretation:
+      CV < 30%:  Low variability (monotonous)
+      CV 30-50%: Moderate variability (acceptable)
+      CV > 50%:  High variability (engaging)
+
+    The plugin flags 4+ consecutive sentences of similar length.
+
+Passive Voice Detection            *writing-metrics-passive-voice*
+    Detects passive voice constructions.
+    Reports count and percentage of passive sentences.
+
+    Example passive constructions:
+      " "The report was written by the team."
+      " "Mistakes were made."
+      " "The data is being analyzed."
+
+    Recommendations:
+      " Grant writing: < 5% passive
+      " Creative writing: < 10% passive
+      " Academic writing: < 10% passive
+
+Nominalization Detection           *writing-metrics-nominalization*
+    Identifies noun forms of verbs.
+    Often makes writing less direct.
+
+    Examples:
+      " "make a decision" í "decide"
+      " "provide assistance" í "assist"
+      " "conduct an investigation" í "investigate"
+
+Vocabulary Richness                *writing-metrics-vocabulary*
+    Measures vocabulary diversity:
+      " Type-token ratio (unique words / total words)
+      " Unique word count
+      " Percentage of unique words
+
+    Higher values indicate richer vocabulary.
+
+AI-Style Detection                 *writing-metrics-ai-style*
+    Detects 80+ AI-associated words across 7 tiers:
+      Tier 1: Most notorious (delve, tapestry, landscape, realm)
+      Tier 2: Business jargon (revolutionize, cutting-edge)
+      Tier 3: Academic overuse (aforementioned, paramount)
+      Tier 4: Creative clichÈs (breathtaking, captivating)
+      Tier 5: Metaphorical overuse (journey, unlock)
+      Tier 6: Transition phrases (in today's world)
+      Tier 7: Hedging/filler (it's crucial to understand)
+
+    Recommendations:
+      0 instances:   Authentic, natural voice
+      1-3 instances: Minor review needed
+      4+ instances:  Significant revision recommended
+
+==============================================================================
+STATUSLINE INTEGRATION                      *writing-metrics-statusline*
+
+Integration with lualine.nvim: >lua
+    require("lualine").setup({
+      sections = {
+        lualine_x = {
+          {
+            function()
+              local metrics = require("writing-metrics")
+              if metrics.is_writing_buffer() then
+                return metrics.get_statusline_component()
+              end
+              return ""
+            end,
+          },
+        },
+      },
+    })
+<
+
+Integration with heirline.nvim: >lua
+    local WritingMetrics = {
+      condition = function()
+        return require("writing-metrics").is_writing_buffer()
+      end,
+      provider = function()
+        return require("writing-metrics").get_statusline_component()
+      end,
+      hl = { fg = "green" },
+    }
+<
+
+Custom statusline: >lua
+    local metrics = require("writing-metrics")
+    if metrics.is_writing_buffer() then
+      statusline = statusline .. metrics.get_statusline_component()
+    end
+<
+
+==============================================================================
+TROUBLESHOOTING                        *writing-metrics-troubleshooting*
+
+Problem: "Pandoc not found" error
+
+Solution:
+  1. Install Pandoc (see |writing-metrics-requirements|)
+  2. Specify full path in config: >lua
+      require("writing-metrics").setup({
+        pandoc_cmd = "/usr/local/bin/pandoc",
+      })
+<
+
+Problem: "Filter not found" error
+
+Solution:
+  1. Check if filter exists: >
+      :!ls ~/.local/bin/textmetrics.lua
+<
+  2. Specify custom path: >lua
+      require("writing-metrics").setup({
+        filter_path = "/path/to/textmetrics.lua",
+      })
+<
+
+Problem: Performance issues with large files
+
+Solution:
+  1. Increase cache TTL: >lua
+      require("writing-metrics").setup({
+        cache_ttl_statusline = 2000,
+        cache_ttl_reports = 60000,
+      })
+<
+  2. Disable statusline: >lua
+      require("writing-metrics").setup({
+        enable_statusline = false,
+      })
+<
+  3. Use fast mode: >
+      :WritingMetricsToggle
+<
+
+Problem: Cache not updating
+
+Solution:
+  1. Check cache status: >
+      :WritingMetricsCache
+<
+  2. Clear cache manually: >
+      :lua require("writing-metrics").clear_cache()
+<
+  3. Check autocommands: >
+      :autocmd WritingMetrics
+<
+
+Problem: Metrics seem inaccurate
+
+Solution:
+  1. Ensure Pandoc version >= 2.19: >
+      :!pandoc --version
+<
+  2. Test Pandoc filter manually: >
+      :!echo "Test sentence." | pandoc --lua-filter ~/.local/bin/textmetrics.lua
+<
+  3. Check file type is supported: >
+      :set filetype?
+<
+
+==============================================================================
+ABOUT                                            *writing-metrics-about*
+
+Author:       Jordan Keim
+License:      MIT License
+Repository:   https://github.com/jkeim/nvim-writing-metrics
+Issues:       https://github.com/jkeim/nvim-writing-metrics/issues
+Discussions:  https://github.com/jkeim/nvim-writing-metrics/discussions
+
+Contributing: See CONTRIBUTING.md in repository
+
+Related projects:
+  " vim-wordy - Style checking dictionaries
+  " ltex-ls - Grammar checking via LSP
+  " vale - Prose linting with style guides
+
+==============================================================================
+vim:tw=78:ts=8:ft=help:norl:

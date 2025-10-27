@@ -7,7 +7,13 @@ local M = {}
 --- @param source_bufnr number Source buffer number
 --- @return number|nil Report buffer number if exists and valid
 function M.find_existing_report(source_bufnr)
-  local report_bufnr = _G.writing_metrics_reports[source_bufnr]
+  -- Use filepath as key, not buffer number (buffers can be reused for different files)
+  local source_filepath = vim.api.nvim_buf_get_name(source_bufnr)
+  if source_filepath == "" then
+    return nil  -- Unnamed buffers don't get tracked
+  end
+
+  local report_bufnr = _G.writing_metrics_reports[source_filepath]
 
   if report_bufnr and vim.api.nvim_buf_is_valid(report_bufnr) then
     return report_bufnr
@@ -15,7 +21,7 @@ function M.find_existing_report(source_bufnr)
 
   -- Clean up stale reference
   if report_bufnr then
-    _G.writing_metrics_reports[source_bufnr] = nil
+    _G.writing_metrics_reports[source_filepath] = nil
   end
 
   return nil
@@ -724,8 +730,11 @@ function M.create_report_buffer(lines, opts)
     local buffer_name = M.generate_report_name(source_bufnr)
     vim.api.nvim_buf_set_name(bufnr, buffer_name)
 
-    -- Store mapping in global tracking table
-    _G.writing_metrics_reports[source_bufnr] = bufnr
+    -- Store mapping in global tracking table (use filepath as key)
+    local source_filepath = vim.api.nvim_buf_get_name(source_bufnr)
+    if source_filepath ~= "" then
+      _G.writing_metrics_reports[source_filepath] = bufnr
+    end
   end
 
   -- Set buffer-local keymaps

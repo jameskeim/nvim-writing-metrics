@@ -2,52 +2,113 @@ name: Tests
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main ]
+    branches: [main]
+  workflow_dispatch:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    name: Run Tests
+    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        nvim-version: ['stable', 'nightly']
+        os: [ubuntu-latest, macos-latest]
+        neovim: [stable, nightly]
 
     steps:
-    - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Install Neovim
-      uses: rhysd/action-setup-vim@v1
-      with:
-        neovim: true
-        version: ${{ matrix.nvim-version }}
+      - name: Install Neovim
+        uses: rhysd/action-setup-vim@v1
+        with:
+          neovim: true
+          version: ${{ matrix.neovim }}
 
-    - name: Install Pandoc
-      run: |
-        wget https://github.com/jgm/pandoc/releases/download/3.1.11/pandoc-3.1.11-1-amd64.deb
-        sudo dpkg -i pandoc-3.1.11-1-amd64.deb
+      - name: Install Pandoc (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pandoc
 
-    - name: Verify Pandoc installation
-      run: pandoc --version
+      - name: Install Pandoc (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install pandoc
 
-    - name: Install StyLua (optional)
-      run: |
-        wget -qO- https://github.com/JohnnyMorganz/StyLua/releases/latest/download/stylua-linux-x86_64.zip | sudo funzip > /usr/local/bin/stylua
-        sudo chmod +x /usr/local/bin/stylua || true
+      - name: Verify Pandoc installation
+        run: |
+          pandoc --version
 
-    - name: Run StyLua check
-      run: stylua --check . || echo "StyLua not available or check failed, continuing..."
-      continue-on-error: true
+      - name: Install plenary.nvim
+        run: |
+          mkdir -p /tmp/nvim-writing-metrics-test/site/pack/vendor/start
+          git clone --depth=1 https://github.com/nvim-lua/plenary.nvim \
+            /tmp/nvim-writing-metrics-test/site/pack/vendor/start/plenary.nvim
 
-    - name: Run smoke test
-      run: |
-        nvim --headless --noplugin -u NONE \
-          -c "set runtimepath+=." \
-          -c "lua require('writing-metrics')" \
-          -c "quit"
+      - name: Run tests
+        run: |
+          nvim --version
+          nvim --headless -u tests/minimal_init.lua \
+            -c "PlenaryBustedDirectory tests/ { minimal_init = './tests/minimal_init.lua' }" \
+            -c "quit"
 
-    - name: Run tests (if plenary available)
-      run: |
-        nvim --headless --noplugin -u tests/minimal_init.lua \
-          -c "PlenaryBustedDirectory tests/" || echo "Tests require plenary.nvim"
-      continue-on-error: true
+      - name: Test summary
+        if: always()
+        run: |
+          echo "Tests completed on ${{ matrix.os }} with Neovim ${{ matrix.neovim }}"
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Lua
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lua5.4 luarocks
+
+      - name: Install luacheck
+        run: |
+          sudo luarocks install luacheck
+
+      - name: Run luacheck
+        run: |
+          luacheck lua/ --globals vim
+
+  documentation:
+    name: Documentation Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check README exists
+        run: |
+          if [ ! -f README.md ]; then
+            echo "ERROR: README.md not found"
+            exit 1
+          fi
+          echo "README.md found"
+
+      - name: Check documentation structure
+        run: |
+          # Check for required sections
+          grep -q "Installation" README.md || (echo "Missing Installation section" && exit 1)
+          grep -q "Usage" README.md || (echo "Missing Usage section" && exit 1)
+          grep -q "Configuration" README.md || (echo "Missing Configuration section" && exit 1)
+          echo "Documentation structure is valid"
+
+      - name: Check filter file exists
+        run: |
+          if [ ! -f pandoc/textmetrics.lua ]; then
+            echo "ERROR: pandoc/textmetrics.lua not found"
+            exit 1
+          fi
+          echo "Pandoc filter found"

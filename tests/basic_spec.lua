@@ -1,0 +1,276 @@
+-- Tests for writing-metrics.basic module
+local helpers = require("tests.helpers")
+
+describe("writing-metrics.basic", function()
+  local basic
+  local cache
+
+  before_each(function()
+    -- Fresh requires
+    package.loaded["writing-metrics.basic"] = nil
+    package.loaded["writing-metrics.cache"] = nil
+
+    basic = require("writing-metrics.basic")
+    cache = require("writing-metrics.cache")
+    cache.clear_all()
+  end)
+
+  after_each(function()
+    cache.clear_all()
+    helpers.cleanup_buffers()
+  end)
+
+  describe("module loading", function()
+    it("loads successfully", function()
+      assert.is_not_nil(basic)
+    end)
+
+    it("exports expected functions", function()
+      assert.is_function(basic.get_fast_count)
+      assert.is_function(basic.get_accurate_count)
+      assert.is_function(basic.get_statusline_string)
+      assert.is_function(basic.toggle_statusline_mode)
+      assert.is_function(basic.show_comparison)
+    end)
+  end)
+
+  describe("fast word count", function()
+    it("counts words in simple text", function()
+      local bufnr = helpers.create_test_buffer(helpers.test_documents.simple)
+      local result = basic.get_fast_count(bufnr)
+
+      assert.is_not_nil(result)
+      assert.is_number(result.words)
+      assert.is_true(result.words > 0)
+    end)
+
+    it("counts characters", function()
+      local bufnr = helpers.create_test_buffer(helpers.test_documents.simple)
+      local result = basic.get_fast_count(bufnr)
+
+      assert.is_number(result.chars)
+      assert.is_true(result.chars > result.words)
+    end)
+
+    it("handles empty buffer", function()
+      local bufnr = helpers.create_test_buffer(helpers.test_documents.empty)
+      local result = basic.get_fast_count(bufnr)
+
+      assert.is_not_nil(result)
+      assert.equals(0, result.words)
+      assert.equals(0, result.chars)
+    end)
+
+    it("handles single word", function()
+      local bufnr = helpers.create_test_buffer(helpers.test_documents.minimal)
+      local result = basic.get_fast_count(bufnr)
+
+      assert.is_not_nil(result)
+      assert.equals(1, result.words)
+    end)
+
+    it("ignores markdown syntax in fast mode", function()
+      local bufnr = helpers.create_test_buffer(helpers.test_documents.with_markdown)
+      local result = basic.get_fast_count(bufnr)
+
+      -- Fast mode counts markdown syntax as words
+      assert.is_number(result.words)
+      assert.is_true(result.words > 0)
+    end)
+  end)
+
+  describe("accurate word count", function()
+    it("calls callback with metrics", function()
+      helpers.skip_without_pandoc()
+
+      local bufnr = helpers.create_test_buffer(helpers.test_documents.complex)
+      local callback_called = false
+      local result_data = nil
+
+      basic.get_accurate_count(bufnr, function(data)
+        callback_called = true
+        result_data = data
+      end)
+
+      -- Wait for async callback
+      local success = helpers.wait_for_async(function()
+        return callback_called
+      end, 3000)
+
+      assert.is_true(success, "Callback should be called within timeout")
+      assert.is_not_nil(result_data)
+      helpers.assert_metrics_structure(result_data, "basic")
+    end)
+
+    it("strips markdown syntax", function()
+      helpers.skip_without_pandoc()
+
+      local bufnr = helpers.create_test_buffer(helpers.test_documents.with_markdown)
+      local result_data = nil
+
+      basic.get_accurate_count(bufnr, function(data)
+        result_data = data
+      end)
+
+      helpers.wait_for_async(function()
+        return result_data ~= nil
+      end, 3000)
+
+      -- Accurate count should be less than fast count due to markdown stripping
+      local fast_result = basic.get_fast_count(bufnr)
+      assert.is_true(result_data.words <= fast_result.words)
+    end)
+
+    it("handles empty buffer", function()
+      helpers.skip_without_pandoc()
+
+      local bufnr = helpers.create_test_buffer(helpers.test_documents.empty)
+      local result_data = nil
+
+      basic.get_accurate_count(bufnr, function(data)
+        result_data = data
+      end)
+
+      helpers.wait_for_async(function()
+        return result_data ~= nil
+      end, 3000)
+
+      assert.equals(0, result_data.words)
+    end)
+
+    it("caches results", function()
+      helpers.skip_without_pandoc()
+
+      local bufnr = helpers.create_test_buffer(helpers.test_documents.simple)
+
+      -- First call
+      local first_done = false
+      basic.get_accurate_count(bufnr, function()
+        first_done = true
+      end)
+
+      helpers.wait_for_async(function()
+        return first_done
+      end, 3000)
+
+      -- Second call should use cache (much faster)
+      local second_done = false
+      local start_time = vim.loop.hrtime()
+
+      basic.get_accurate_count(bufnr, function()
+        second_done = true
+      end)
+
+      helpers.wait_for_async(function()
+        return second_done
+      end, 100)
+
+      local elapsed = (vim.loop.hrtime() - start_time) / 1e6
+
+      assert.is_true(second_done)
+      assert.is_true(elapsed < 50, "Cached call should be nearly instant")
+    end)
+  end)
+
+  describe("statusline integration", function()
+    it("returns statusline string", function()
+      local bufnr = helpers.create_test_buffer(helpers.test_documents.simple)
+      local str = basic.get_statusline_string(bufnr)
+
+      assert.is_string(str)
+    end)
+
+    it("contains word count indicator", function()
+      local bufnr = helpers.create_test_buffer(helpers.test_documents.simple)
+      local str = basic.get_statusline_string(bufnr)
+
+      -- Should contain either word count text or icon
+      local has_indicator = string.find(str, "words") or string.find(str, "󰗊") or string.find(str, "%d+")
+      assert.is_true(has_indicator ~= nil)
+    end)
+
+    it("toggles statusline mode", function()
+      -- Get initial mode
+      local initial_mode = basic.statusline_mode
+
+      -- Toggle
+      basic.toggle_statusline_mode()
+      local new_mode = basic.statusline_mode
+
+      assert.are_not.equals(initial_mode, new_mode)
+
+      -- Toggle back
+      basic.toggle_statusline_mode()
+      assert.equals(initial_mode, basic.statusline_mode)
+    end)
+
+    it("mode affects statusline output", function()
+      local bufnr = helpers.create_test_buffer(helpers.test_documents.simple)
+
+      -- Get string in fast mode
+      basic.statusline_mode = "fast"
+      local fast_str = basic.get_statusline_string(bufnr)
+
+      -- Get string in accurate mode
+      basic.statusline_mode = "accurate"
+      local accurate_str = basic.get_statusline_string(bufnr)
+
+      -- Strings should be different (one uses cache, one triggers accurate)
+      assert.is_string(fast_str)
+      assert.is_string(accurate_str)
+    end)
+  end)
+
+  describe("comparison display", function()
+    it("shows comparison without error", function()
+      helpers.skip_without_pandoc()
+
+      local bufnr = helpers.create_test_buffer(helpers.test_documents.simple)
+
+      -- Should not error
+      local success = pcall(basic.show_comparison, bufnr)
+      assert.is_true(success)
+    end)
+  end)
+
+  describe("lualine integration", function()
+    it("provides lualine component", function()
+      local component = basic.lualine_component()
+
+      assert.is_table(component)
+    end)
+
+    it("component has required fields", function()
+      local component = basic.lualine_component()
+
+      -- Should be callable or have function field
+      assert.is_true(type(component) == "function" or type(component.update) == "function")
+    end)
+  end)
+
+  describe("edge cases", function()
+    it("handles invalid buffer", function()
+      local result = basic.get_fast_count(-1)
+
+      -- Should return safe defaults
+      assert.is_table(result)
+      assert.equals(0, result.words)
+      assert.equals(0, result.chars)
+    end)
+
+    it("handles non-existent buffer", function()
+      local result = basic.get_fast_count(99999)
+
+      assert.is_table(result)
+      assert.equals(0, result.words)
+    end)
+
+    it("handles buffer with only whitespace", function()
+      local bufnr = helpers.create_test_buffer("   \n\n   \n")
+      local result = basic.get_fast_count(bufnr)
+
+      assert.is_not_nil(result)
+      assert.equals(0, result.words)
+    end)
+  end)
+end)

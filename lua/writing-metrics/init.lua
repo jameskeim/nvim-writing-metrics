@@ -4,8 +4,8 @@
 local M = {}
 
 --- Global tracking table for report buffers
---- Maps source_bufnr → report_bufnr
---- @type table<number, number>
+--- Maps source_filepath → report_bufnr
+--- @type table<string, number>
 _G.writing_metrics_reports = _G.writing_metrics_reports or {}
 
 --- Plugin initialization state
@@ -53,15 +53,16 @@ function M.setup(opts)
       callback = function(args)
         local bufnr = args.buf
 
-        -- If this is a source buffer, remove its report mapping
-        if _G.writing_metrics_reports[bufnr] then
-          _G.writing_metrics_reports[bufnr] = nil
+        -- If this is a source buffer, remove its report mapping (by filepath)
+        local filepath = vim.api.nvim_buf_get_name(bufnr)
+        if filepath ~= "" and _G.writing_metrics_reports[filepath] then
+          _G.writing_metrics_reports[filepath] = nil
         end
 
-        -- If this is a report buffer, remove all mappings to it
-        for source_bufnr, report_bufnr in pairs(_G.writing_metrics_reports) do
+        -- If this is a report buffer, remove all mappings pointing to it
+        for source_filepath, report_bufnr in pairs(_G.writing_metrics_reports) do
           if report_bufnr == bufnr then
-            _G.writing_metrics_reports[source_bufnr] = nil
+            _G.writing_metrics_reports[source_filepath] = nil
           end
         end
       end,
