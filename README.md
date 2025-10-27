@@ -188,9 +188,9 @@ Full configuration options in [`lua/writing-metrics/config.lua`](lua/writing-met
 
 Different writing needs different readability levels:
 
-**Grant Writing**: Flesch-Kincaid 11-14, Flesch Reading Ease 50-60
-**Fiction**: Flesch-Kincaid 7-9, Flesch Reading Ease 60-80
-**Academic**: Flesch-Kincaid 12-16, Flesch Reading Ease 30-50
+- **Grant Writing**: Flesch-Kincaid 11-14, Flesch Reading Ease 50-60
+- **Fiction**: Flesch-Kincaid 7-9, Flesch Reading Ease 60-80
+- **Academic**: Flesch-Kincaid 12-16, Flesch Reading Ease 30-50
 
 The plugin's reports include interpretation guidance for each metric.
 
