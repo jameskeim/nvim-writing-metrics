@@ -722,7 +722,7 @@ function M.create_report_buffer(lines, opts)
   -- Set buffer options
   vim.api.nvim_buf_set_option(bufnr, "filetype", "markdown")
   vim.api.nvim_buf_set_option(bufnr, "buftype", "nofile")
-  vim.api.nvim_buf_set_option(bufnr, "bufhidden", "wipe")
+  vim.api.nvim_buf_set_option(bufnr, "bufhidden", "hide")  -- Keep buffer when hidden (multiple reports)
   vim.api.nvim_buf_set_option(bufnr, "modifiable", false)
 
   -- Set unique buffer name based on source
