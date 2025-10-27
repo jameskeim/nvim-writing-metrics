@@ -12,7 +12,8 @@ M.statusline_mode = "fast"
 M.statusline_updating = false
 
 --- Cache for visual mode selections (no persistence needed)
-local selection_cache = {}
+--- Note: Currently unused, reserved for future visual mode enhancements
+-- local selection_cache = {}
 
 -- ═══════════════════════════════════════════════════════════════
 -- CORE COUNTING FUNCTIONS
@@ -358,54 +359,23 @@ end
 --- Update accurate count for statusline display
 --- Called on TextChanged, InsertLeave, BufWritePost
 function M.update_statusline_accurate_count()
-  -- DEBUG: Write to file
-  local debug_file = io.open("/tmp/statusline_debug.txt", "a")
-  if debug_file then
-    debug_file:write(os.date("%H:%M:%S") .. " - update_statusline_accurate_count called, mode=" .. M.statusline_mode .. "\n")
-    debug_file:close()
-  end
-
   -- Only run if in accurate mode
   if M.statusline_mode ~= "accurate" then
-    local debug_file = io.open("/tmp/statusline_debug.txt", "a")
-    if debug_file then
-      debug_file:write(os.date("%H:%M:%S") .. " - Not in accurate mode, returning\n")
-      debug_file:close()
-    end
     return
   end
 
   -- Prevent concurrent updates (debounce)
   if M.statusline_updating then
-    local debug_file2 = io.open("/tmp/statusline_debug.txt", "a")
-    if debug_file2 then
-      debug_file2:write(os.date("%H:%M:%S") .. " - Already updating, skipping\n")
-      debug_file2:close()
-    end
     return
   end
 
   local bufnr = vim.api.nvim_get_current_buf()
-  local debug_file2 = io.open("/tmp/statusline_debug.txt", "a")
-  if debug_file2 then
-    debug_file2:write(os.date("%H:%M:%S") .. " - Running accurate count for buffer " .. bufnr .. "\n")
-    debug_file2:close()
-  end
 
   -- Set updating flag (for debouncing only, not for display)
   M.statusline_updating = true
 
   -- Run accurate count async
   M.get_accurate_count(bufnr, function(result, method)
-    local debug_file3 = io.open("/tmp/statusline_debug.txt", "a")
-    if debug_file3 then
-      debug_file3:write(os.date("%H:%M:%S") .. " - Callback: result=" .. tostring(result ~= nil) .. ", method=" .. method .. "\n")
-      if result then
-        debug_file3:write(os.date("%H:%M:%S") .. " - Result data: words=" .. (result.words or "nil") .. ", chars=" .. (result.chars or "nil") .. "\n")
-      end
-      debug_file3:close()
-    end
-
     -- Clear updating flag
     M.statusline_updating = false
 
@@ -424,26 +394,8 @@ end
 function M.toggle_statusline_mode()
   local utils = require("writing-metrics.utils")
 
-  -- DEBUG: Clear old log and start fresh
-  if M.statusline_mode == "fast" then
-    os.remove("/tmp/statusline_debug.txt")
-  end
-
-  local debug_file = io.open("/tmp/statusline_debug.txt", "a")
-  if debug_file then
-    debug_file:write("\n=== TOGGLE at " .. os.date("%H:%M:%S") .. " ===\n")
-    debug_file:write("Current mode: " .. M.statusline_mode .. "\n")
-    debug_file:close()
-  end
-
   if M.statusline_mode == "fast" then
     M.statusline_mode = "accurate"
-
-    local debug_file2 = io.open("/tmp/statusline_debug.txt", "a")
-    if debug_file2 then
-      debug_file2:write("Switched to accurate mode, calling update_statusline_accurate_count()\n")
-      debug_file2:close()
-    end
 
     -- Initialize accurate cache by running count immediately
     M.update_statusline_accurate_count()
@@ -538,35 +490,14 @@ end
 -- ═══════════════════════════════════════════════════════════════
 
 --- Create user commands for backward compatibility
-function M.setup_commands()
-  -- Main word count command
-  vim.api.nvim_create_user_command("WordCount", function()
-    M.show_comparison(0)
-  end, { desc = "Show accurate word count with comparison" })
-
-  -- Backward compatibility aliases
-  vim.api.nvim_create_user_command("AccurateWordCount", function()
-    M.show_comparison(0)
-  end, { desc = "Show accurate word count (alias)" })
-
-  -- Toggle mode command
-  vim.api.nvim_create_user_command("WritingMetricsToggle", function()
-    M.toggle_statusline_mode()
-  end, { desc = "Toggle fast/accurate word count mode" })
-
-  vim.api.nvim_create_user_command("ToggleWordCountMode", function()
-    M.toggle_statusline_mode()
-  end, { desc = "Toggle word count mode (alias)" })
-end
-
 -- ═══════════════════════════════════════════════════════════════
 -- MODULE INITIALIZATION
 -- ═══════════════════════════════════════════════════════════════
 
 --- Initialize the basic module
+--- Note: Commands are registered in plugin/writing-metrics.lua
 function M.setup()
   M.setup_autocmds()
-  M.setup_commands()
 
   -- Setup cache autocmds
   local cache = require("writing-metrics.cache")

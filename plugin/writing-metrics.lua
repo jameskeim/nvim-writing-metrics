@@ -121,6 +121,26 @@ local function setup_commands()
     desc = "Toggle between fast and accurate word count mode",
   })
 
+  -- Backward compatibility aliases
+  vim.api.nvim_create_user_command("AccurateWordCount", function(opts)
+    local basic = require("writing-metrics.basic")
+    if opts.range == 2 then
+      basic.show_comparison(vim.fn.getpos("'<")[2], vim.fn.getpos("'>")[2])
+    else
+      basic.show_comparison()
+    end
+  end, {
+    desc = "Show word count (backward compat alias)",
+    range = true,
+  })
+
+  vim.api.nvim_create_user_command("ToggleWordCountMode", function()
+    local basic = require("writing-metrics.basic")
+    basic.toggle_statusline_mode()
+  end, {
+    desc = "Toggle word count mode (backward compat alias)",
+  })
+
   vim.api.nvim_create_user_command("WritingMetricsCache", function()
     local cache = require("writing-metrics.cache")
     local config = require("writing-metrics.config")
