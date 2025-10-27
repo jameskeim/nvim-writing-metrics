@@ -124,7 +124,7 @@ function M.format_report(data)
   table.insert(lines, "")
   table.insert(lines, "---")
   table.insert(lines, "")
-  table.insert(lines, "**Navigation:** Press `q` to close | `r` to refresh | `1`-`8` to jump to sections")
+  table.insert(lines, "**Navigation:** Press `q` to close | `<leader>mr` from document to regenerate | `1`-`8` to jump to sections")
   table.insert(lines, "")
 
   return lines
@@ -740,11 +740,6 @@ function M.setup_report_keymaps(bufnr)
   -- Close report
   vim.keymap.set("n", "q", "<cmd>close<cr>", opts)
   vim.keymap.set("n", "<Esc>", "<cmd>close<cr>", opts)
-
-  -- Refresh report
-  vim.keymap.set("n", "r", function()
-    require("writing-metrics.full").show_report(0)
-  end, vim.tbl_extend("force", opts, { desc = "Refresh report" }))
 
   -- Jump to sections
   vim.keymap.set("n", "1", "/^## 📊<CR>:nohlsearch<CR>", opts)
