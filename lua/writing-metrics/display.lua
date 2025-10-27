@@ -693,10 +693,11 @@ end
 
 --- Create report buffer and display it
 --- @param lines table Lines to display
---- @param opts table Options (window_type, title)
+--- @param opts table Options (window_type, source_bufnr)
 function M.create_report_buffer(lines, opts)
   opts = opts or {}
   local window_type = opts.window_type or "tab"
+  local source_bufnr = opts.source_bufnr
 
   -- Open new window
   if window_type == "tab" then
@@ -718,8 +719,13 @@ function M.create_report_buffer(lines, opts)
   vim.api.nvim_buf_set_option(bufnr, "bufhidden", "wipe")
   vim.api.nvim_buf_set_option(bufnr, "modifiable", false)
 
-  if opts.title then
-    vim.api.nvim_buf_set_name(bufnr, opts.title)
+  -- Set unique buffer name based on source
+  if source_bufnr then
+    local buffer_name = M.generate_report_name(source_bufnr)
+    vim.api.nvim_buf_set_name(bufnr, buffer_name)
+
+    -- Store mapping in global tracking table
+    _G.writing_metrics_reports[source_bufnr] = bufnr
   end
 
   -- Set buffer-local keymaps
