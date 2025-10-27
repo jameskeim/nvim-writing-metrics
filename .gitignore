@@ -1,0 +1,26 @@
+# OS files
+.DS_Store
+Thumbs.db
+
+# Vim swap files
+*.swp
+*.swo
+*.swn
+*~
+
+# Tags
+tags
+tags.lock
+tags.temp
+
+# Neovim runtime
+.luarc.json
+.luacheckrc
+
+# Test artifacts
+tests/output/
+
+# Build artifacts
+*.so
+*.dll
+*.dylib
