@@ -43,6 +43,34 @@ function M.setup(opts)
   local cache = get_cache()
   cache.setup_autocmds()
 
+  --- Setup cleanup autocmds for report tracking
+  local function setup_report_cleanup()
+    local group = vim.api.nvim_create_augroup("WritingMetricsReportCleanup", { clear = true })
+
+    -- Clean up tracking table when buffers are deleted
+    vim.api.nvim_create_autocmd({ "BufDelete", "BufWipeout" }, {
+      group = group,
+      callback = function(args)
+        local bufnr = args.buf
+
+        -- If this is a source buffer, remove its report mapping
+        if _G.writing_metrics_reports[bufnr] then
+          _G.writing_metrics_reports[bufnr] = nil
+        end
+
+        -- If this is a report buffer, remove all mappings to it
+        for source_bufnr, report_bufnr in pairs(_G.writing_metrics_reports) do
+          if report_bufnr == bufnr then
+            _G.writing_metrics_reports[source_bufnr] = nil
+          end
+        end
+      end,
+    })
+  end
+
+  -- Call setup function
+  setup_report_cleanup()
+
   M._initialized = true
   return true
 end
