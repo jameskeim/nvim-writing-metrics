@@ -107,6 +107,6 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on reporting bugs, suggest
 
 ## Links
 
-- [Repository](https://github.com/jkeim/nvim-writing-metrics)
-- [Issues](https://github.com/jkeim/nvim-writing-metrics/issues)
-- [Discussions](https://github.com/jkeim/nvim-writing-metrics/discussions)
+- [Repository](https://github.com/jameskeim/nvim-writing-metrics)
+- [Issues](https://github.com/jameskeim/nvim-writing-metrics/issues)
+- [Discussions](https://github.com/jameskeim/nvim-writing-metrics/discussions)

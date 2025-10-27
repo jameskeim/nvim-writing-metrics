@@ -83,7 +83,7 @@ helpers.test_documents.with_markdown -- Markdown formatting
 - **Triggers:** Push to main/develop, PRs, manual
 - **Matrix:** Ubuntu + macOS × stable + nightly = 4 runs
 - **Jobs:** test, lint, documentation
-- **Badge:** [![Tests](https://github.com/jkeim/nvim-writing-metrics/workflows/Tests/badge.svg)](https://github.com/jkeim/nvim-writing-metrics/actions)
+- **Badge:** [![Tests](https://github.com/jameskeim/nvim-writing-metrics/workflows/Tests/badge.svg)](https://github.com/jameskeim/nvim-writing-metrics/actions)
 
 ## Documentation
 

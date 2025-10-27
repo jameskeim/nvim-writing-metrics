@@ -8,7 +8,7 @@ Add to your `lazy.nvim` configuration:
 
 ```lua
 {
-  "your-username/nvim-writing-metrics",
+  "jameskeim/nvim-writing-metrics",
   dependencies = { "folke/snacks.nvim" },  -- Optional but recommended
   cmd = { "WordCount", "ReadabilityReport" },
   ft = { "markdown", "text", "tex", "fountain", "org" },
@@ -24,7 +24,7 @@ Add to your `lazy.nvim` configuration:
 
 ```lua
 use {
-  "your-username/nvim-writing-metrics",
+  "jameskeim/nvim-writing-metrics",
   requires = { "folke/snacks.nvim" },
   cmd = { "WordCount", "ReadabilityReport" },
   ft = { "markdown", "text", "tex" },
@@ -37,7 +37,7 @@ use {
 ### Using vim-plug
 
 ```vim
-Plug 'your-username/nvim-writing-metrics'
+Plug 'jameskeim/nvim-writing-metrics'
 ```
 
 ## Basic Usage
@@ -121,7 +121,7 @@ The plugin works out of the box with sensible defaults. To customize:
 
 ```lua
 {
-  "your-username/nvim-writing-metrics",
+  "jameskeim/nvim-writing-metrics",
   opts = {
     cache = {
       basic_ttl = 500,    -- 500ms cache for statusline
@@ -229,6 +229,6 @@ opts = {
 
 ## Support
 
-- Report issues: https://github.com/your-username/nvim-writing-metrics/issues
+- Report issues: https://github.com/jameskeim/nvim-writing-metrics/issues
 - Read docs: `:help writing-metrics` (TODO: create help docs)
 - Check examples: `examples/` directory in plugin repository
