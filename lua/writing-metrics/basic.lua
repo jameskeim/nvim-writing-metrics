@@ -377,7 +377,7 @@ function M.get_statusline_string(bufnr)
   local utils = require("writing-metrics.utils")
 
   -- Check if we're in a writing filetype
-  local ft = vim.api.nvim_buf_get_option(bufnr, "filetype")
+  local ft = vim.api.nvim_get_option_value("filetype", { buf = bufnr })
   if not utils.is_writing_filetype(ft) then
     return ""
   end
@@ -451,7 +451,7 @@ function M.lualine_component()
       return M.get_statusline_string(0)
     end,
     cond = function()
-      local ft = vim.api.nvim_buf_get_option(0, "filetype")
+      local ft = vim.api.nvim_get_option_value("filetype", { buf = 0 })
       local utils = require("writing-metrics.utils")
       return utils.is_writing_filetype(ft)
     end,
@@ -552,7 +552,7 @@ function M.setup_autocmds()
   vim.api.nvim_create_autocmd("TextChanged", {
     group = group,
     callback = function(args)
-      local ft = vim.api.nvim_buf_get_option(args.buf, "filetype")
+      local ft = vim.api.nvim_get_option_value("filetype", { buf = args.buf })
       local utils = require("writing-metrics.utils")
 
       if utils.is_writing_filetype(ft) then
@@ -565,7 +565,7 @@ function M.setup_autocmds()
   vim.api.nvim_create_autocmd("InsertLeave", {
     group = group,
     callback = function(args)
-      local ft = vim.api.nvim_buf_get_option(args.buf, "filetype")
+      local ft = vim.api.nvim_get_option_value("filetype", { buf = args.buf })
       local utils = require("writing-metrics.utils")
 
       if utils.is_writing_filetype(ft) then
@@ -579,7 +579,7 @@ function M.setup_autocmds()
   vim.api.nvim_create_autocmd("BufWritePost", {
     group = group,
     callback = function(args)
-      local ft = vim.api.nvim_buf_get_option(args.buf, "filetype")
+      local ft = vim.api.nvim_get_option_value("filetype", { buf = args.buf })
       local utils = require("writing-metrics.utils")
 
       if utils.is_writing_filetype(ft) then
