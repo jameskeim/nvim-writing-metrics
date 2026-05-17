@@ -970,7 +970,10 @@ function Pandoc(el)
     -- Calculate readability formulas
     local readability = {
       coleman_liau = calculate_coleman_liau(words, sentences, total_word_chars),
-      automated_readability = calculate_ari(chars, words, sentences),
+      -- ARI canonically uses letter count, not total chars (which would
+      -- include spaces and punctuation). total_word_chars is already
+      -- tracked for Coleman-Liau and is the correct denominator here.
+      automated_readability = calculate_ari(total_word_chars, words, sentences),
       flesch_reading_ease = calculate_flesch_reading_ease(words, sentences, total_syllables),
       flesch_kincaid_grade = calculate_flesch_kincaid(words, sentences, total_syllables),
       gunning_fog = calculate_gunning_fog(words, sentences, complex_words),

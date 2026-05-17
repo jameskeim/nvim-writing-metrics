@@ -346,5 +346,37 @@ Conclusions remain controversial.
         "char count should be 4 codepoints, not 5 bytes; got: "
         .. tostring(result_data.basic.characters))
     end)
+
+    describe("ARI calculation", function()
+      it("uses letter chars, not total chars (which includes spaces)", function()
+        helpers.skip_without_pandoc()
+
+        -- Controlled input: 2 words, 1 sentence, easy to verify.
+        -- "Hello world." → Hello=5 letters, world=5 letters, total_word_chars=10.
+        -- ARI with letter chars: 4.71 * (10/2) + 0.5 * (2/1) - 21.43
+        --                      = 23.55 + 1 - 21.43 = 3.12
+        -- ARI with total chars (~12 including space and period):
+        --                      = 4.71 * (12/2) + 0.5 * (2/1) - 21.43
+        --                      = 28.26 + 1 - 21.43 = 7.83
+        -- The pre-fix value will be substantially higher; assert ARI < 5.
+        local content = "Hello world."
+        local bufnr = helpers.create_test_buffer(content)
+
+        local result_data = nil
+        require("writing-metrics.full").get_full_metrics(bufnr, function(success, data)
+          if success then result_data = data end
+        end)
+
+        helpers.wait_for_async(function() return result_data ~= nil end, 5000)
+
+        assert.is_not_nil(result_data, "filter should produce data")
+        assert.is_table(result_data.readability)
+        local ari = result_data.readability.automated_readability
+        assert.is_number(ari)
+        assert.is_true(ari < 5,
+          "ARI should compute from letter chars (~3.12 for this input), "
+          .. "not total chars (~7.83); got: " .. tostring(ari))
+      end)
+    end)
   end)
 end)
