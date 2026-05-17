@@ -8,6 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Reading time estimation derived from the cached word count, with two
+  configurable profiles (silent, default 200 wpm; spoken, default 150 wpm).
+  Surfaces in three places:
+  - statusline suffix appended to the existing word/char display
+    (`⏱`/`🎤`, profile-selectable via `reading_time.statusline_profile`)
+  - `:ReadingTime` toast showing both profiles at once
+  - Two rows in the Basic Statistics section of `:ReadabilityReport`
+- `reading_time` config block (5 keys: `enabled`, `wpm_silent`, `wpm_spoken`,
+  `statusline`, `statusline_profile`)
+- `basic.get_reading_time(bufnr)` public API for callers that want the
+  pre-formatted reading-time table
 - Initial plugin implementation
 - Basic metrics calculation (word, character, sentence, paragraph counts)
 - Six readability formulas:

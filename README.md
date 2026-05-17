@@ -150,7 +150,18 @@ Using [lazy.nvim](https://github.com/folke/lazy.nvim):
 
 - `:WordCount` - Show word count and basic metrics in floating window
 - `:ReadabilityReport` - Generate comprehensive analysis in new tab
+- `:ReadingTime` - Show a toast with silent and spoken reading-time estimates
 - `:WritingMetricsToggle` - Switch between fast and accurate counting modes
+
+### Reading Time
+
+The plugin estimates reading time from the cached word count and surfaces it in three places:
+
+- **Statusline:** appended after the word/char counts (e.g. `⏱ ~5 min`).
+- **`:ReadingTime`:** a toast with both profiles (`~5 min silent · ~7 min spoken`).
+- **`:ReadabilityReport`:** two rows in the Basic Statistics table, one per profile.
+
+Defaults: **200 wpm silent** (typical adult silent reading), **150 wpm spoken** (typical presentation pace). Configure under the `reading_time` block (see Configuration below).
 
 ### Statusline Integration
 
@@ -178,6 +189,13 @@ require("writing-metrics").setup({
   },
   display = {
     report_window = "tab",  -- "tab", "split", or "vsplit"
+  },
+  reading_time = {
+    enabled = true,                 -- master switch for the feature
+    wpm_silent = 200,               -- silent reading speed
+    wpm_spoken = 150,               -- presentation / spoken delivery rate
+    statusline = true,              -- show suffix in statusline
+    statusline_profile = "silent",  -- "silent" | "spoken" | "both"
   },
 })
 ```
