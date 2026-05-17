@@ -324,4 +324,27 @@ Conclusions remain controversial.
         "stdout should be six-field metrics line; got: " .. stdout)
     end)
   end)
+
+  describe("char counting", function()
+    it("counts UTF-8 characters as codepoints not bytes", function()
+      helpers.skip_without_pandoc()
+
+      -- 'café' is 4 codepoints but 5 bytes (é is U+00E9, 2 bytes in UTF-8).
+      local content = "café"
+      local bufnr = helpers.create_test_buffer(content)
+
+      local result_data = nil
+      require("writing-metrics.full").get_full_metrics(bufnr, function(success, data)
+        if success then result_data = data end
+      end)
+
+      helpers.wait_for_async(function() return result_data ~= nil end, 5000)
+
+      assert.is_not_nil(result_data, "filter should produce data")
+      assert.is_table(result_data.basic)
+      assert.equals(4, result_data.basic.characters,
+        "char count should be 4 codepoints, not 5 bytes; got: "
+        .. tostring(result_data.basic.characters))
+    end)
+  end)
 end)

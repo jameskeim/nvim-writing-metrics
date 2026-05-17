@@ -809,8 +809,11 @@ wordcount = {
       end
     end
 
-    -- Count all characters in text nodes (both modes)
-    chars = chars + #el.text
+    -- Count all characters in text nodes (both modes).
+    -- Use utf8.len for codepoint count; #el.text is byte length which
+    -- inflates counts for non-ASCII text (smart quotes, em-dashes, accents).
+    -- Fall back to byte length if the text is not valid UTF-8.
+    chars = chars + (utf8.len(el.text) or #el.text)
 
     -- Count sentences: look for sentence-ending punctuation at end of string (both modes).
     -- Guard against abbreviations (Dr., Mr., e.g.) and decimal numbers (3.14, $4.20)
