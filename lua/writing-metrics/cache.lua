@@ -21,19 +21,6 @@ local function now()
   return vim.loop.now()
 end
 
---- Check if a cache entry is still valid
---- @param entry CacheEntry|nil Cache entry
---- @param ttl number Time-to-live in milliseconds
---- @return boolean
-function M.is_valid(entry, ttl)
-  if not entry then
-    return false
-  end
-
-  local age = now() - entry.timestamp
-  return age < ttl
-end
-
 --- Get basic metrics from cache
 --- Content-based caching (like Vim's native wordcount):
 --- - Cache is valid as long as buffer content hasn't changed
@@ -108,7 +95,6 @@ end
 --- Get comprehensive cache statistics
 --- @return table Statistics including cache size and memory usage
 function M.get_statistics()
-  local config = require("writing-metrics.config")
   local basic_count = 0
   local basic_memory = 0
 
@@ -123,7 +109,6 @@ function M.get_statistics()
     basic = {
       count = basic_count,
       memory = basic_memory,
-      ttl = config.config.cache.basic_ttl,
     },
   }
 end

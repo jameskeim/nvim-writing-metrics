@@ -57,6 +57,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Vim help documentation (doc/writing-metrics.txt)
 - Test suite with plenary.nvim
 
+### Removed
+- `cache.basic_ttl` config option and `cache.is_valid()` function — both
+  obsoleted by the changedtick-based cache validation introduced earlier.
+  The `cache = {}` block can be removed from user setup() calls. Passing
+  it is harmless (deep-merge ignores unknown keys), but the value has no
+  effect since validation no longer uses TTL.
+
 ### Dependencies
 - Neovim >= 0.10
 - Pandoc >= 2.19

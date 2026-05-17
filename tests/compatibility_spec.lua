@@ -185,33 +185,6 @@ describe("backward compatibility", function()
     end)
   end)
 
-  describe("configuration compatibility", function()
-    it("accepts old-style configuration", function()
-      local success = pcall(metrics.setup, {
-        cache = {
-          basic_ttl = 500,
-          full_ttl = 30000,
-        },
-      })
-
-      assert.is_true(success)
-    end)
-
-    it("merges user config with defaults", function()
-      metrics.setup({
-        cache = {
-          basic_ttl = 999,
-        },
-      })
-
-      local config = require("writing-metrics.config")
-      local settings = config.get()
-
-      assert.equals(999, settings.cache.basic_ttl)
-      assert.is_number(settings.cache.full_ttl)
-    end)
-  end)
-
   describe("display function compatibility", function()
     it("show_comparison exists", function()
       local basic = require("writing-metrics.basic")

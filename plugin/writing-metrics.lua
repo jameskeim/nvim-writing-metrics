@@ -92,7 +92,7 @@ local function setup_commands()
       "## Configuration",
       "",
       "**Cache strategy:**",
-      "- Statusline: Basic metrics cached for " .. config.config.cache.basic_ttl .. "ms",
+      "- Statusline: Basic metrics cached until buffer content changes (changedtick)",
       "- Reports: Always compute fresh (no cache)",
       "",
       "**Enabled features:**",

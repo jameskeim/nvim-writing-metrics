@@ -184,9 +184,6 @@ See [`examples/lualine-integration.lua`](examples/lualine-integration.lua) for c
 ```lua
 require("writing-metrics").setup({
   filetypes = { "markdown", "text", "tex", "fountain" },
-  cache = {
-    basic_ttl = 500,  -- Cache duration for statusline (ms)
-  },
   display = {
     report_window = "tab",  -- "tab", "split", or "vsplit"
   },

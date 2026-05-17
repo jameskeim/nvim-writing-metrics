@@ -4,12 +4,6 @@ local M = {}
 
 --- Default configuration values
 M.defaults = {
-  -- Cache settings (single-tier for statusline only)
-  cache = {
-    basic_ttl = 500, -- 500ms for responsive statusline
-    -- Reports always compute fresh (no cache)
-  },
-
   -- Feature toggles
   features = {
     basic = true, -- Word count, characters, sentences

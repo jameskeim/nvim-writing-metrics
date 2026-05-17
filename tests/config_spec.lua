@@ -32,23 +32,8 @@ describe("writing-metrics.config", function()
       local defaults = config.get()
 
       assert.is_table(defaults)
-      assert.is_table(defaults.cache)
       assert.is_table(defaults.filter)
       assert.is_table(defaults.commands)
-    end)
-
-    it("has reasonable cache TTL values", function()
-      local defaults = config.get()
-
-      assert.is_number(defaults.cache.basic_ttl)
-      assert.is_number(defaults.cache.full_ttl)
-
-      -- Basic should be shorter than full
-      assert.is_true(defaults.cache.basic_ttl <= defaults.cache.full_ttl)
-
-      -- Should be in milliseconds (reasonable range)
-      assert.is_true(defaults.cache.basic_ttl >= 100)
-      assert.is_true(defaults.cache.basic_ttl <= 10000)
     end)
 
     it("has filter configuration", function()
@@ -66,36 +51,6 @@ describe("writing-metrics.config", function()
   end)
 
   describe("user configuration", function()
-    it("merges user options with defaults", function()
-      config.setup({
-        cache = {
-          basic_ttl = 1000,
-        },
-      })
-
-      local settings = config.get()
-
-      assert.equals(1000, settings.cache.basic_ttl)
-      -- Other defaults should still be present
-      assert.is_number(settings.cache.full_ttl)
-      assert.is_table(settings.filter)
-    end)
-
-    it("preserves nested options not overridden", function()
-      config.setup({
-        cache = {
-          basic_ttl = 999,
-        },
-      })
-
-      local settings = config.get()
-
-      -- Modified value
-      assert.equals(999, settings.cache.basic_ttl)
-      -- Unmodified nested value
-      assert.is_number(settings.cache.full_ttl)
-    end)
-
     it("allows disabling legacy commands", function()
       config.setup({
         commands = {
