@@ -123,10 +123,6 @@ The plugin works out of the box with sensible defaults. To customize:
 {
   "jameskeim/nvim-writing-metrics",
   opts = {
-    cache = {
-      basic_ttl = 500,    -- 500ms cache for statusline
-      full_ttl = 30000,   -- 30s cache for reports
-    },
     features = {
       basic = true,
       readability = true,
@@ -210,10 +206,6 @@ For very large files (100K+ words):
 
 ```lua
 opts = {
-  cache = {
-    basic_ttl = 1000,   -- Slower statusline updates
-    full_ttl = 60000,   -- 1-minute cache for reports
-  },
   statusline = {
     mode = "fast",  -- Use fast counting (no Pandoc)
   },

@@ -492,7 +492,6 @@ The plugin detects 80+ AI-associated words organized into 7 tiers:
 **Content-Based Caching (Not Time-Based):**
 - Cache validation is based on content hash, not TTL
 - Cache remains valid indefinitely until buffer content changes
-- The `basic_ttl` config value (500ms default) exists for statistics display but does NOT control cache expiration
 - See `cache.lua:28-35` - the `is_valid()` function exists but is not used by `get_basic()`
 
 **Cache Invalidation:**
@@ -805,5 +804,3 @@ Configured in `config.lua:defaults.filetypes`.
 2. **Cache hash function**: Simple hash using content length + first/last 100 chars (not cryptographic, just for cache invalidation)
 3. **Debug logging**: `basic.lua` has debug file logging to `/tmp/statusline_debug.txt` (can be removed if not needed)
 4. **Pandoc version check**: Requires >= 2.19 for Lua filter support; checked in `config.validate_pandoc()`
-5. **TTL config value**: The `config.cache.basic_ttl` exists but is NOT used for cache validation - it's only shown in cache statistics. Cache invalidation is content-based only.
-6. **No full_ttl**: Despite mentions in some documentation, there is no `full_ttl` config option because reports never cache

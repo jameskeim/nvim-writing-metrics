@@ -27,8 +27,8 @@ describe("writing-metrics integration", function()
 
     it("accepts configuration options", function()
       local success = pcall(metrics.setup, {
-        cache = {
-          basic_ttl = 1000,
+        features = {
+          basic = true,
         },
       })
       assert.is_true(success)

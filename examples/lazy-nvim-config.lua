@@ -83,12 +83,6 @@
     { "<leader>mC", "<cmd>WritingMetricsCache<cr>", desc = "Cache status" },
   },
   opts = {
-    -- Cache configuration
-    cache = {
-      basic_ttl = 500,     -- 500ms cache for statusline (fast updates)
-      full_ttl = 30000,    -- 30s cache for full reports (expensive computation)
-    },
-
     -- Feature toggles (enable/disable specific analyses)
     features = {
       basic = true,                -- Word/char/sentence counts
@@ -154,9 +148,6 @@
     { "<leader>mr", "<cmd>ReadabilityReport<cr>", desc = "Readability report" },
   },
   opts = {
-    cache = {
-      full_ttl = 60000,  -- 60s cache (grants change less frequently)
-    },
     features = {
       basic = true,
       readability = true,
@@ -232,10 +223,6 @@
     { "<leader>wr", "<cmd>ReadabilityReport<cr>", desc = "Readability" },
   },
   opts = {
-    cache = {
-      basic_ttl = 0,     -- Disable statusline caching
-      full_ttl = 30000,
-    },
     features = {
       basic = true,
       readability = true,
@@ -265,10 +252,6 @@
     { "<leader>mr", "<cmd>ReadabilityReport<cr>", desc = "Readability report" },
   },
   opts = {
-    cache = {
-      basic_ttl = 1000,    -- 1s cache (slower updates, less overhead)
-      full_ttl = 120000,   -- 2min cache (very expensive for large docs)
-    },
     features = {
       basic = true,
       readability = true,

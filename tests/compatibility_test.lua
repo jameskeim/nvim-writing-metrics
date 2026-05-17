@@ -280,15 +280,6 @@ function M.test_config_system()
   assert_not_nil(config_module.features, "config.features should exist")
   assert_not_nil(config_module.targets, "config.targets should exist")
 
-  -- Test default values
-  assert_true(
-    config_module.cache.basic_ttl == 500,
-    "Default basic_ttl should be 500ms"
-  )
-  assert_true(
-    config_module.cache.full_ttl == 30000,
-    "Default full_ttl should be 30000ms"
-  )
 end
 
 -- Test 10: Display module

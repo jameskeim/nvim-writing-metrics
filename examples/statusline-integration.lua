@@ -291,7 +291,6 @@ vim.o.statusline = "%{%v:lua.minimal_statusline()%}"
 --
 -- Example performance tuning:
 -- opts = {
---   cache = { basic_ttl = 1000 },  -- 1s cache for slower updates
 --   statusline = { mode = "fast" }, -- Use fast counting
 -- }
 
