@@ -759,7 +759,8 @@ function M.setup_report_keymaps(bufnr)
 
   -- Close report
   vim.keymap.set("n", "q", "<cmd>close<cr>", opts)
-  vim.keymap.set("n", "<Esc>", "<cmd>close<cr>", opts)
+  -- <Esc> intentionally NOT mapped: users press it reflexively for unrelated
+  -- reasons (clearing search highlight, breaking out of pending ops). Use q.
 
   -- Jump to sections
   vim.keymap.set("n", "1", "/^## 📊<CR>:nohlsearch<CR>", opts)
