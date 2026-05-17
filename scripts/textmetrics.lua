@@ -789,24 +789,13 @@ wordcount = {
   end,
 
   Code = function(el)
-    -- Count words in inline code (both modes)
-    _,n = el.text:gsub("%S+","")
-    words = words + n
-    -- Count characters in inline code
-    chars = chars + #el.text
+    -- Inline code is markup, not prose. Skip word/char/syllable counting.
+    return el
   end,
 
   CodeBlock = function(el)
-    -- Count words in code blocks (both modes)
-    _,n = el.text:gsub("%S+","")
-    words = words + n
-    -- Count characters in code blocks (including newlines)
-    chars = chars + #el.text
-    -- Code blocks count as paragraphs
-    paragraphs = paragraphs + 1
-    -- Count lines in code block
-    _,line_count = el.text:gsub("\n","")
-    lines = lines + line_count + 1  -- +1 for the last line
+    -- Code blocks are not prose; exclude from readability denominators.
+    return el
   end,
 
   SoftBreak = function(el)

@@ -248,6 +248,29 @@ describe("writing-metrics.basic", function()
     end)
   end)
 
+  describe("accurate word count - code block exclusion", function()
+    it("excludes fenced code block content from word counts", function()
+      helpers.skip_without_pandoc()
+
+      local content = "This is one prose sentence with five words.\n\n```python\nprint(\"hello\")\ndef foo():\n    return 42\n```\n\nAnother prose sentence with five words.\n"
+      local bufnr = helpers.create_test_buffer(content)
+      local done = false
+      local result_words
+
+      basic.get_accurate_count(bufnr, function(data)
+        result_words = data and data.words
+        done = true
+      end)
+
+      helpers.wait_for_async(function() return done end, 5000)
+      assert.is_true(done, "Callback should be called within timeout")
+      -- 14 prose words (8 + 6); code block has ~5 tokens. Tolerate small parser-side variance.
+      -- Before fix: 19 words (code content leaked in). After fix: 14 words (prose only).
+      assert.is_true(result_words <= 16, "got " .. tostring(result_words) .. " words; code block likely not excluded")
+      assert.is_true(result_words >= 12, "got " .. tostring(result_words) .. " words; prose appears under-counted")
+    end)
+  end)
+
   describe("edge cases", function()
     it("handles invalid buffer", function()
       local result = basic.get_fast_count(-1)
