@@ -60,7 +60,7 @@ The filter is auto-detected in this order:
 - **No time-based expiration**: TTL values exist in config but are NOT used for cache validation
 - Cache invalidates immediately on text changes via autocmds (`TextChanged`, `TextChangedI`, `InsertLeave`, `BufWritePost`)
 - When invalidated, cache is marked "stale" but preserves last count for display
-- Cache entry structure: `{content_hash, timestamp, data, stale}`
+- Cache entry structure: `{changedtick, timestamp, data, stale}`
 - See `cache.lua:45-63` for implementation
 
 **Report generation** (full metrics):
@@ -489,20 +489,18 @@ The plugin detects 80+ AI-associated words organized into 7 tiers:
 
 ### Cache Implementation Details
 
-**Content-Based Caching (Not Time-Based):**
-- Cache validation is based on content hash, not TTL
-- Cache remains valid indefinitely until buffer content changes
-- See `cache.lua:28-35` - the `is_valid()` function exists but is not used by `get_basic()`
+**Changedtick-based caching:**
+- Cache validation reads `vim.b[bufnr].changedtick` — Neovim's built-in per-buffer modification counter
+- Cache remains valid indefinitely until buffer content actually changes; cursor moves and mode changes don't invalidate
+- See `cache.content_changed()` in `lua/writing-metrics/cache.lua`
 
 **Cache Invalidation:**
-- Triggered by autocmds on actual text changes: `TextChanged`, `TextChangedI`, `InsertLeave`, `BufWritePost`
-- Cache is marked "stale" but data is preserved for display (shows last known count while updating)
-- Content hash uses buffer length + first/last 100 chars (fast, non-cryptographic)
+- Driven by `changedtick` comparison; the prior cached tick is stored alongside the data
+- Autocmds (`TextChanged`, `TextChangedI`, `InsertLeave`, `BufWritePost`) trigger recompute attempts; cache is marked "stale" so the statusline shows the last known count while updating
 
 **No Report Cache:**
 - Reports always compute fresh on every `:ReadabilityReport` invocation
-- No TTL, no caching - full Pandoc analysis every time
-- This ensures reports always reflect current document state
+- No caching — full Pandoc analysis every time, so output always reflects the current document state
 
 ### Output Format Specifications
 
@@ -801,6 +799,5 @@ Configured in `config.lua:defaults.filetypes`.
 ## Known Quirks
 
 1. **Report buffer names**: Use `vim.fn.fnamemodify(bufname, ":t")` to extract tail when checking for "Report:" prefix, as absolute paths vary
-2. **Cache hash function**: Simple hash using content length + first/last 100 chars (not cryptographic, just for cache invalidation)
-3. **Debug logging**: `basic.lua` has debug file logging to `/tmp/statusline_debug.txt` (can be removed if not needed)
-4. **Pandoc version check**: Requires >= 2.19 for Lua filter support; checked in `config.validate_pandoc()`
+2. **Debug logging**: `basic.lua` has debug file logging to `/tmp/statusline_debug.txt` (can be removed if not needed)
+3. **Pandoc version check**: Requires >= 2.19 for Lua filter support; checked in `config.validate_pandoc()`

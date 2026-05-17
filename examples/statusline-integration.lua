@@ -280,14 +280,14 @@ vim.o.statusline = "%{%v:lua.minimal_statusline()%}"
 -- ============================================================================
 
 -- The plugin uses intelligent caching to minimize performance impact:
--- - Basic metrics cached for 500ms (default)
--- - Statusline calls return immediately from cache
+-- - Basic metrics cached per-buffer; revalidated only when changedtick changes
+-- - Cursor moves, mode changes, and window events don't trigger recomputation
+-- - Statusline calls return immediately from cache when content hasn't changed
 -- - No blocking computation in statusline rendering
 --
 -- If you experience performance issues with very large files (> 100K words):
--- 1. Increase cache TTL in plugin opts
--- 2. Use "fast" mode instead of "accurate" mode
--- 3. Disable statusline integration and use commands only
+-- 1. Use "fast" mode instead of "accurate" mode
+-- 2. Disable statusline integration and use commands only
 --
 -- Example performance tuning:
 -- opts = {
@@ -305,9 +305,8 @@ vim.o.statusline = "%{%v:lua.minimal_statusline()%}"
 -- 4. Clear cache: :WritingMetricsClear!
 --
 -- If statusline shows stale values:
--- 1. Reduce cache TTL
--- 2. Force cache invalidation on text change
--- 3. Switch to "fast" mode (no cache)
+-- 1. Clear the cache: :WritingMetricsClear!
+-- 2. Switch to "fast" mode (no Pandoc overhead)
 
 -- ============================================================================
 -- BACKWARD COMPATIBILITY

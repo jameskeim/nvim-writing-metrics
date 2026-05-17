@@ -120,52 +120,36 @@ User presses <leader>mr
 ```
 t=0s:    User opens file
          └─> Statusline requests basic metrics
-              └─> Cache miss → Trigger Pandoc (mode="basic")
+              └─> Cache miss (no changedtick stored) → Trigger Pandoc (mode="basic")
               └─> Show "..." in statusline
 
 t=0.1s:  Pandoc completes
-         └─> Store in basic cache (TTL: 500ms)
+         └─> Store in basic cache (changedtick=1)
          └─> Statusline updates: "1,247 words"
 
-t=0.6s:  Statusline refresh
-         └─> Basic cache expired (TTL: 500ms)
-         └─> Check full cache → Empty
+t=1s:    Statusline refresh (no edit since open)
+         └─> changedtick still 1 → Cache valid → Use cached ✓
+
+t=2s:    User edits text
+         └─> changedtick becomes 2
+         └─> Next statusline refresh sees changedtick changed
          └─> Trigger Pandoc (mode="basic")
 
-t=0.7s:  Pandoc completes
-         └─> Store in basic cache
-
-t=1.2s:  Statusline refresh
-         └─> Basic cache expired
-         └─> Trigger Pandoc (mode="basic")
+t=2.1s:  Pandoc completes
+         └─> Store in basic cache (changedtick=2)
 
 t=3s:    User presses <leader>mr (full report)
-         └─> Full cache miss
-         └─> Trigger Pandoc (mode="full")
-
-t=3.5s:  Pandoc completes (full metrics)
-         └─> Store in full cache (TTL: 30s)
-         └─> Extract and store basic metrics
+         └─> Execute Pandoc (mode="full") — always fresh, no cache
          └─> Display report
 
-t=4s:    Statusline refresh
-         └─> Basic cache expired
-         └─> Check full cache → VALID! ✓
-         └─> Extract basic from full (no Pandoc needed!)
-         └─> Update basic cache
+t=3.5s:  Pandoc completes (full metrics)
+         └─> Display report (not stored in cache)
 
-t=4.5s:  Statusline refresh
-         └─> Basic cache valid → Use cached ✓
-
-t=5s:    Statusline refresh
-         └─> Basic cache expired
-         └─> Check full cache → VALID! ✓
-         └─> Extract basic from full (optimization!)
-
-... continues extracting from full cache until t=33.5s (full TTL expires)
+t=4s:    Statusline refresh (no edit since t=2s)
+         └─> changedtick still 2 → Cache valid → Use cached ✓
 ```
 
-**Key Insight:** After requesting a full report, the statusline gets "free" updates for 30 seconds by extracting from the full cache instead of re-running Pandoc.
+**Key Insight:** The statusline cache is driven entirely by `changedtick`. Cursor moves, scrolling, and mode switches don't invalidate the cache — only actual text edits do.
 
 ## Automatic Cache Invalidation
 
@@ -176,15 +160,13 @@ User types in buffer
   │     │
   │     ├─> cache.content_changed(bufnr)
   │     │     │
-  │     │     ├─> Generate current content hash
-  │     │     ├─> Compare with cached hash
+  │     │     ├─> Read vim.b[bufnr].changedtick
+  │     │     ├─> Compare with stored tick in cache entry
   │     │     │
-  │     │     └─> Hash different?
-  │     │           └─> cache.invalidate(bufnr)
-  │     │                 ├─> Clear basic cache
-  │     │                 └─> Clear full cache
+  │     │     └─> Tick different?
+  │     │           └─> Mark cache stale (preserve last data for display)
   │     │
-  │     └─> Next metrics request triggers fresh computation
+  │     └─> Next metrics request triggers fresh Pandoc computation
   │
   └─> Statusline shows updated metrics after Pandoc completes
 ```
@@ -201,8 +183,8 @@ config.lua
   └─> Provides: Configuration, validation, auto-detection
 
 cache.lua
-  ├─> Depends on: utils (for content hashing)
-  └─> Provides: Two-tier caching with smart extraction
+  ├─> Depends on: (none, reads changedtick via vim.b[bufnr])
+  └─> Provides: Changedtick-based caching for basic metrics
 
 utils.lua
   ├─> Depends on: config (for filter path)
@@ -213,10 +195,8 @@ utils.lua
 
 | Operation | Time | Path |
 |-----------|------|------|
-| Cache hit (basic) | < 0.1ms | Memory lookup |
-| Cache hit (full) | < 0.1ms | Memory lookup |
-| Extract basic from full | < 0.5ms | JSON traversal |
-| Content hash generation | 1-2ms | String operations |
+| Cache hit (basic) | < 0.1ms | changedtick comparison |
+| Changedtick read | < 0.1ms | vim.b[bufnr] lookup |
 | Pandoc (basic mode) | 50-100ms | External process |
 | Pandoc (full mode) | 200-500ms | External process |
 | Display floating window | 1-2ms | Neovim API |
@@ -226,19 +206,14 @@ utils.lua
 
 ```
 Basic cache entry:   ~1 KB
-  ├─> content_hash:  100 bytes
+  ├─> changedtick:   8 bytes
   ├─> timestamp:     8 bytes
   └─> data:          ~900 bytes (6 numbers + metadata)
 
-Full cache entry:    ~5-10 KB
-  ├─> content_hash:  100 bytes
-  ├─> timestamp:     8 bytes
-  └─> data:          ~5-10 KB (all metrics, depends on text length)
-
-Total per buffer:    ~6-11 KB (both caches)
+Total per buffer:    ~1 KB (basic cache only)
 ```
 
-**For 10 open writing buffers:** ~60-110 KB total memory usage
+**For 10 open writing buffers:** ~10 KB total memory usage
 
 ## Error Handling Flow
 

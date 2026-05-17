@@ -191,16 +191,15 @@ The plugin works out of the box with sensible defaults. To customize:
 ### Stale word counts
 
 1. Clear cache: `:WritingMetricsClear!`
-2. Reduce cache TTL in config
-3. Switch to fast mode: `:WritingMetricsToggle`
+2. Switch to fast mode: `:WritingMetricsToggle`
 
 ## Performance
 
 The plugin is optimized for large documents:
 
-- **Statusline:** Updates cached every 500ms (no lag)
-- **Basic metrics:** Uses Vim's native counting (instant)
-- **Full reports:** Cached for 30s (expensive Pandoc analysis runs once)
+- **Statusline:** Basic metrics cached per-buffer; revalidated only when content changes (`b:changedtick`), so cursor moves and mode changes don't trigger recomputation.
+- **Basic metrics:** Uses Vim's native counting (instant).
+- **Full reports:** Computed fresh on every `:ReadabilityReport` — no cache, so output always reflects the current buffer state.
 
 For very large files (100K+ words):
 

@@ -33,7 +33,7 @@ This plugin brings those tools into your editor.
 
 ### Content-Based Caching
 
-Cache invalidates on actual text changes, not time-based expiration. Uses [`vim.api.nvim_buf_get_lines()`](https://neovim.io/doc/user/api.html#nvim_buf_get_lines()) to compute content hashes. Similar to Vim's native `wordcount()` behavior.
+Cache invalidates on actual text changes, not time-based expiration. Uses `vim.b[bufnr].changedtick` — Neovim's built-in per-buffer modification counter — so cursor moves and mode changes don't trigger recomputation.
 
 ### Async Pandoc Execution
 

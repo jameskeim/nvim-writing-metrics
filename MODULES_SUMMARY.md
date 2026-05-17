@@ -28,9 +28,8 @@ lua/writing-metrics/
 - Target ranges for different writing types (grant/creative/academic)
 
 ### 3. `cache.lua` - Smart Caching
-- 2-tier cache: basic (500ms TTL) + full (30s TTL)
-- Content hashing for invalidation detection
-- Smart extraction: basic metrics from full cache
+- Changedtick-based invalidation (no TTL)
+- Cache remains valid until buffer content changes
 - Auto-cleanup on buffer delete
 - Periodic stale entry cleanup (5 min)
 
@@ -47,14 +46,14 @@ lua/writing-metrics/
 - Lightweight word/char/sentence counting
 - Optimized for statusline updates
 - Minimal Pandoc execution (basic mode)
-- 500ms cache TTL for real-time feel
+- Changedtick-based cache; recomputes only when content changes
 
 ### 6. `full.lua` - Comprehensive Reports
 - Full Pandoc execution with all metrics
 - JSON parsing and validation
 - Report generation orchestration
 - Progress notifications
-- 30s cache TTL for expensive computation
+- No cache — always computes fresh on every invocation
 
 ### 7. `display.lua` - Report Formatting
 - 8 section formatters (basic, readability, variety, etc.)
@@ -73,17 +72,15 @@ lua/writing-metrics/
 ```
 statusline → get_basic(bufnr)
               ↓
-         Check cache (500ms TTL)
-              ↓ (if cache miss)
-         Check full cache (30s TTL)
-              ↓ (if exists, extract basic)
+         Check cache (changedtick)
+              ↓ (if changedtick unchanged)
          Return cached basic
-              ↓ (if no cache)
+              ↓ (if changedtick changed)
          Execute Pandoc (basic mode)
               ↓
          Parse space-separated output
               ↓
-         Store in cache
+         Store in cache (with current changedtick)
               ↓
          Return metrics
 ```
@@ -96,13 +93,9 @@ full.show_report()
        ↓
 full.get_full_metrics()
        ↓
-Check cache (30s TTL)
-       ↓ (if cache miss)
-Execute Pandoc (full mode)
+Execute Pandoc (full mode)  [always fresh — no cache]
        ↓
 Parse JSON output
-       ↓
-Store in cache + extract basic
        ↓
 display.format_report()
        ↓
@@ -117,35 +110,23 @@ Setup keybindings (q, r, 1-8)
 
 ## Caching Strategy
 
-### Two-Tier System
+### Changedtick-Based Cache (Basic Metrics Only)
 
-**Basic Cache (500ms TTL):**
+**Basic Cache:**
 - Purpose: Real-time statusline updates
 - Size: ~50 bytes per buffer (6 numbers)
-- Invalidation: Text change, save, 500ms timeout
-- Fallback: Extract from full cache if available
+- Invalidation: `vim.b[bufnr].changedtick` change (content edit, save)
+- Cursor moves, mode changes, and window events do NOT invalidate
 
-**Full Cache (30s TTL):**
-- Purpose: Expensive comprehensive analysis
-- Size: ~2-5 KB per buffer (full JSON)
-- Invalidation: Text change, save, 30s timeout
-- Bonus: Auto-populates basic cache
-
-### Smart Extraction
-
-When basic cache expires but full cache is valid:
-```lua
--- Instead of recomputing basic metrics:
-basic_data = extract_basic_from_full(full_cache)
--- Saves Pandoc execution!
-```
+**Full Reports (No Cache):**
+- Every `:ReadabilityReport` runs a fresh Pandoc analysis
+- Ensures output always reflects the current document state
 
 ### Performance Impact
 
 | Operation | Without Cache | With Cache | Improvement |
 |-----------|---------------|------------|-------------|
 | Basic metrics | 50-100ms | <1ms | 50-100x |
-| Full report | 300-500ms | <5ms | 60-100x |
 | Statusline update | 50ms | <1ms | 50x |
 
 ## Backward Compatibility
@@ -161,7 +142,7 @@ All existing functionality preserved:
 | `toggle_mode()` | `init.toggle_mode()` | ✓ Same |
 | `get_wordcount()` | `init.get_wordcount()` | ✓ Same |
 | Global `_G.text_metrics` | Shim in init.lua | ✓ Compatible |
-| Cache system | Enhanced 2-tier | ✓ Compatible |
+| Cache system | Changedtick-based | ✓ Compatible |
 
 ### Migration Path
 
@@ -256,7 +237,7 @@ require("writing-metrics.full").show_report()
 |--------|-------|------|----------------|
 | init.lua | 517 | ~15 KB | Public API, compatibility |
 | config.lua | 249 | ~8 KB | Configuration, validation |
-| cache.lua | 303 | ~9 KB | 2-tier caching |
+| cache.lua | 303 | ~9 KB | Changedtick-based caching |
 | utils.lua | 379 | ~12 KB | Utilities, Pandoc execution |
 | basic.lua | ~100 | ~3 KB | Fast basic metrics |
 | full.lua | ~100 | ~4 KB | Full report orchestration |
@@ -283,9 +264,9 @@ require("writing-metrics.full").show_report()
 - Stale entry cleanup: Every 5 minutes
 
 ### Computation Time
-- Basic metrics: 50-100ms (uncached), <1ms (cached)
-- Full report: 300-500ms (uncached), <5ms (cached)
-- Cache extraction: 0ms (instant)
+- Basic metrics: 50-100ms (cache miss), <1ms (cache hit)
+- Full report: 300-500ms (always fresh — no cache)
+- Cache lookup: 0ms (instant)
 
 ### UI Responsiveness
 - Async Pandoc execution (non-blocking)

@@ -274,9 +274,6 @@ function M.test_config_system()
   local config_module = require("writing-metrics.config")
 
   assert_not_nil(config_module, "Config module should exist")
-  assert_not_nil(config_module.cache, "config.cache should exist")
-  assert_not_nil(config_module.pandoc, "config.pandoc should exist")
-  assert_not_nil(config_module.ui, "config.ui should exist")
   assert_not_nil(config_module.features, "config.features should exist")
   assert_not_nil(config_module.targets, "config.targets should exist")
 
