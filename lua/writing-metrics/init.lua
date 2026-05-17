@@ -102,7 +102,7 @@ end
 --- @return boolean
 function M.is_writing_buffer(bufnr)
   bufnr = bufnr or vim.api.nvim_get_current_buf()
-  local ft = vim.api.nvim_buf_get_option(bufnr, "filetype")
+  local ft = vim.api.nvim_get_option_value("filetype", { buf = bufnr })
   local utils = get_utils()
   return utils.is_writing_filetype(ft)
 end
