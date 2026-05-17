@@ -119,6 +119,9 @@ function M.run_pandoc(input_file, mode, callback)
   local filter_path = config.get_filter_path()
 
   if not filter_path then
+    -- Caller's cleanup runs inside vim.system callback, which won't fire
+    -- on early return. Clean up the temp file here to avoid leaking it.
+    M.cleanup_temp_file(input_file)
     callback(false, "Pandoc filter not found")
     return
   end
