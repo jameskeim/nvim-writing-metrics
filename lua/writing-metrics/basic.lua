@@ -337,6 +337,31 @@ end
 -- STATUSLINE INTEGRATION
 -- ═══════════════════════════════════════════════════════════════
 
+--- Build the statusline reading-time suffix (e.g., "  ⏱ ~5 min").
+--- Returns "" if disabled, no cached words, or invalid config.
+--- @param bufnr integer
+--- @return string
+local function statusline_reading_time_suffix(bufnr)
+  local config = require("writing-metrics.config").config.reading_time
+  if not config or not config.enabled or not config.statusline then
+    return ""
+  end
+
+  local rt = M.get_reading_time(bufnr)
+  if not rt then return "" end
+
+  local profile = config.statusline_profile or "silent"
+  if profile == "spoken" then
+    return string.format("  🎤 %s", rt.spoken)
+  elseif profile == "both" then
+    -- Compact form: ⏱ ~5/~7 min
+    return string.format("  ⏱ ~%d/~%d min", rt.silent_minutes, rt.spoken_minutes)
+  else
+    -- Default: silent
+    return string.format("  ⏱ %s", rt.silent)
+  end
+end
+
 --- Get formatted statusline string for current buffer
 --- @param bufnr number|nil Buffer number (0 or nil for current)
 --- @return string Formatted statusline component
@@ -379,7 +404,7 @@ function M.get_statusline_string(bufnr)
         "⚡ %s words  󰬶 %s chars",
         utils.format_number(wc.words or 0),
         utils.format_number(wc.chars or 0)
-      ),
+      ) .. statusline_reading_time_suffix(bufnr),
       color = "green", -- Always fresh in fast mode
     }
   end
@@ -398,7 +423,7 @@ function M.get_statusline_string(bufnr)
         icon,
         utils.format_number(cached.words),
         utils.format_number(cached.chars)
-      ),
+      ) .. statusline_reading_time_suffix(bufnr),
       color = color,
     }
   end
@@ -410,7 +435,7 @@ function M.get_statusline_string(bufnr)
       "⚠️ %s words  󰬶 %s chars",
       utils.format_number(wc.words or 0),
       utils.format_number(wc.chars or 0)
-    ),
+    ) .. statusline_reading_time_suffix(bufnr),
     color = "orange", -- Stale/approximate
   }
 end
