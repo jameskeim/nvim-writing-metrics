@@ -626,7 +626,9 @@ function M.format_vocabulary_section(vocabulary)
       local item = vocabulary.most_frequent[i]
       local word = item.word or item[1]
       local word_count = item.count or item[2]
-      local word_pct = (word_count / total) * 100
+      -- Guard against 0/0 = nan or n/0 = inf when total_words is 0
+      -- (empty buffer edge case or upstream miscount).
+      local word_pct = total > 0 and (word_count / total * 100) or 0
       table.insert(lines, string.format("%2d. **%s** - %d times (%.2f%%)", i, word, word_count, word_pct))
     end
 
@@ -637,7 +639,8 @@ function M.format_vocabulary_section(vocabulary)
     for _, item in ipairs(vocabulary.most_frequent) do
       local word = item.word or item[1]
       local word_count = item.count or item[2]
-      local word_pct = (word_count / total) * 100
+      -- Same div-by-zero guard as above.
+      local word_pct = total > 0 and (word_count / total * 100) or 0
       if word_pct > 1.0 then
         table.insert(overused, { word = word, count = word_count, pct = word_pct })
       end
