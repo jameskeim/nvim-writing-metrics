@@ -374,22 +374,6 @@ function M.validate_filter()
   end
 end
 
---- Generate a simple hash of buffer content for cache invalidation
---- @param bufnr number|nil Buffer number
---- @return string Content hash
-function M.get_content_hash(bufnr)
-  bufnr = bufnr or vim.api.nvim_get_current_buf()
-  local content = M.get_buffer_content(bufnr)
-
-  -- Simple hash using string length and first/last chars
-  -- Good enough for cache invalidation without crypto overhead
-  local len = #content
-  local first = content:sub(1, 100)
-  local last = content:sub(-100)
-
-  return string.format("%d:%s:%s", len, first:gsub("\n", " "), last:gsub("\n", " "))
-end
-
 --- Format a number with thousands separators
 --- @param num number Number to format
 --- @return string Formatted number
@@ -439,7 +423,6 @@ end
 
 -- Manual testing:
 -- :lua print(require("writing-metrics.utils").get_buffer_content(0))
--- :lua local hash = require("writing-metrics.utils").get_content_hash(0); print(hash)
 -- :lua print(require("writing-metrics.utils").format_number(12345678))
 -- :lua print(require("writing-metrics.utils").format_percentage(45.678))
 -- :lua require("writing-metrics.utils").notify("Test notification", vim.log.levels.INFO)

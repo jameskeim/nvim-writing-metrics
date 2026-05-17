@@ -130,8 +130,8 @@ end
 
 --- Check if content has changed since last cache
 --- Uses vim.b[bufnr].changedtick — a free, monotonically-increasing per-buffer
---- integer maintained by Neovim. Avoids expensive get_content_hash calls on
---- every TextChangedI (which fires on every keystroke in insert mode).
+--- integer maintained by Neovim. Cheap enough to call on every TextChangedI
+--- (fires on every keystroke in insert mode).
 --- @param bufnr number Buffer number
 --- @return boolean True if content changed
 function M.content_changed(bufnr)
