@@ -155,7 +155,7 @@ describe("writing-metrics.basic", function()
 
       -- Second call should use cache (much faster)
       local second_done = false
-      local start_time = vim.loop.hrtime()
+      local start_time = vim.uv.hrtime()
 
       basic.get_accurate_count(bufnr, function()
         second_done = true
@@ -165,7 +165,7 @@ describe("writing-metrics.basic", function()
         return second_done
       end, 100)
 
-      local elapsed = (vim.loop.hrtime() - start_time) / 1e6
+      local elapsed = (vim.uv.hrtime() - start_time) / 1e6
 
       assert.is_true(second_done)
       assert.is_true(elapsed < 50, "Cached call should be nearly instant")

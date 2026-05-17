@@ -6,7 +6,7 @@ M.create_test_buffer = function(content)
   local bufnr = vim.api.nvim_create_buf(false, true)
   local lines = vim.split(content, "\n")
   vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
-  vim.api.nvim_buf_set_option(bufnr, "filetype", "markdown")
+  vim.api.nvim_set_option_value("filetype", "markdown", { buf = bufnr })
   return bufnr
 end
 
@@ -51,14 +51,14 @@ Paragraph with [link](http://example.com).]],
 -- Wait for async operations with timeout
 M.wait_for_async = function(condition_fn, timeout_ms)
   timeout_ms = timeout_ms or 1000
-  local start = vim.loop.hrtime()
+  local start = vim.uv.hrtime()
 
   while true do
     if condition_fn() then
       return true
     end
 
-    local elapsed = (vim.loop.hrtime() - start) / 1e6
+    local elapsed = (vim.uv.hrtime() - start) / 1e6
     if elapsed > timeout_ms then
       return false
     end
@@ -156,7 +156,7 @@ end
 M.cleanup_buffers = function()
   local buffers = vim.api.nvim_list_bufs()
   for _, bufnr in ipairs(buffers) do
-    if vim.api.nvim_buf_is_valid(bufnr) and not vim.api.nvim_buf_get_option(bufnr, "modified") then
+    if vim.api.nvim_buf_is_valid(bufnr) and not vim.api.nvim_get_option_value("modified", { buf = bufnr }) then
       pcall(vim.api.nvim_buf_delete, bufnr, { force = true })
     end
   end
