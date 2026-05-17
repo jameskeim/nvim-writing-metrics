@@ -2,102 +2,80 @@
 
 This document highlights the key innovations in nvim-writing-metrics that make it performant, user-friendly, and maintainable.
 
-## 1. Smart Cache Extraction
+## 1. Single-Tier Changedtick Cache
 
-**Problem:** Statusline needs frequent updates (500ms), but full reports are expensive (200-500ms).
+**Problem:** The statusline word count is asked for on every redraw, but the buffer rarely changes between most redraws (cursor moves, mode changes, window resizes). Recomputing word/char counts via Pandoc for each call would be wasteful — Pandoc startup alone costs ~150 ms.
 
-**Traditional Solution:** Separate computation for basic and full metrics.
-
-**Our Innovation:** Two-tier cache with smart extraction.
+**Solution:** A single per-buffer cache keyed by buffer number, validated against Neovim's built-in `vim.b[bufnr].changedtick`.
 
 ```lua
-function M.get_basic(bufnr)
-  local basic_entry = cache.basic[bufnr]
-  if basic_entry and M.is_valid(basic_entry, basic_ttl) then
-    return basic_entry.data  -- Fast path
-  end
-
-  -- Smart optimization: extract from full cache if still valid
-  local full_entry = cache.full[bufnr]
-  if full_entry and M.is_valid(full_entry, full_ttl) then
-    local basic_data = extract_basic_from_full(full_entry.data)
-    cache.basic[bufnr] = { timestamp = now(), data = basic_data }
-    return basic_data  -- Extracted from full, no recomputation!
-  end
-
-  return nil  -- Cache miss, need to compute
+function M.set_basic(bufnr, data)
+  local tick = vim.api.nvim_buf_is_valid(bufnr) and vim.b[bufnr].changedtick or -1
+  cache.basic[bufnr] = {
+    changedtick = tick,
+    timestamp = now(),
+    data = data,
+    stale = false,
+  }
 end
-```
 
-**Benefits:**
-- Statusline gets 30 seconds of "free" updates after any full report request
-- Reduces Pandoc executions by ~80% in typical usage
-- Transparent to users
-
-**Real-World Impact:**
-
-Without smart extraction:
-- User requests full report → Pandoc runs (200ms)
-- Statusline updates every 500ms → 60 Pandoc runs per 30 seconds
-- **Total time:** 12 seconds of Pandoc execution
-
-With smart extraction:
-- User requests full report → Pandoc runs (200ms)
-- Statusline extracts from full cache → 0 Pandoc runs for 30 seconds
-- **Total time:** 0.2 seconds of Pandoc execution
-
-**97% reduction in Pandoc overhead!**
-
-## 2. Content-Based Cache Invalidation
-
-**Problem:** Invalidating cache on every TextChanged event causes unnecessary recomputations (cursor movement, undo/redo, etc.).
-
-**Traditional Solution:** Time-based TTL only (leads to stale data).
-
-**Our Innovation:** Content hashing with change detection.
-
-```lua
 function M.content_changed(bufnr)
-  local current_hash = get_content_hash(bufnr)
-  local cached_hash = cache.basic[bufnr] and cache.basic[bufnr].content_hash
-
-  return current_hash ~= cached_hash
+  if not vim.api.nvim_buf_is_valid(bufnr) then
+    return true
+  end
+  local tick = vim.b[bufnr].changedtick
+  local entry = cache.basic[bufnr]
+  return not entry or entry.changedtick ~= tick
 end
-
--- Autocmd only invalidates if content actually changed
-vim.api.nvim_create_autocmd({"TextChanged", "TextChangedI", "InsertLeave"}, {
-  callback = function(args)
-    if M.content_changed(args.buf) then
-      M.invalidate(args.buf)
-    end
-  end,
-})
 ```
 
-**Benefits:**
-- Cache survives cursor movement, mode changes, undo/redo
-- Only invalidates on actual content changes
-- Fast hash computation (no crypto overhead)
+**Why changedtick is the right primitive:**
 
-**Hash Algorithm:**
+- Neovim maintains `b:changedtick` automatically — it increments on every buffer modification (edit, undo, redo, paste).
+- Reading it is O(1) and allocation-free.
+- It does not change on cursor movement, mode changes, or window operations — exactly the events that would force unnecessary recomputation under a naive autocmd-based scheme.
+- Comparing two integers is faster than hashing buffer content; for a 50,000-word document this is the difference between sub-microsecond cache validation and milliseconds of hashing per statusline redraw.
+
+**What's NOT cached:**
+
+Full readability reports always compute fresh (see `full.get_full_metrics`). Reports are infrequent (user-triggered via `<leader>mr`) and benefit more from up-to-date output than from cached staleness. The cache only stores basic metrics for the statusline.
+
+## 2. Async Pandoc Execution
+
+**Problem:** Pandoc invocations take 100-500 ms depending on document size. Blocking the editor for that long on every word-count refresh would be unacceptable.
+
+**Solution:** All Pandoc calls go through `utils.run_pandoc()`, which uses `vim.system()` with an async callback and wraps the callback in `vim.schedule()` so it's safe to call Vimscript functions from the result.
 
 ```lua
-function M.get_content_hash(bufnr)
-  local content = M.get_buffer_content(bufnr)
-  local len = #content
-  local first = content:sub(1, 100)  -- First 100 chars
-  local last = content:sub(-100)     -- Last 100 chars
-  return string.format("%d:%s:%s", len, first, last)
+function M.run_pandoc(input_file, mode, callback)
+  local config = require("writing-metrics.config")
+  local filter_path = config.get_filter_path()
+  if not filter_path then
+    M.cleanup_temp_file(input_file)
+    callback(false, "Pandoc filter not found")
+    return
+  end
+
+  local cmd = { "pandoc", input_file, "--lua-filter", filter_path,
+                "-t", "plain", "--metadata", "metrics_mode=" .. mode }
+
+  vim.system(cmd, { text = true }, function(result)
+    vim.schedule(function()
+      if result.code ~= 0 then
+        callback(false, "Pandoc failed: " .. (result.stderr or "unknown error"))
+        return
+      end
+      callback(true, result.stdout)
+    end)
+  end)
 end
 ```
 
-**Why this works:**
-- Length changes → hash changes
-- Beginning changes → hash changes
-- End changes → hash changes
-- Middle-only changes → hash usually changes (if within 100 chars of start/end)
-- False negatives are acceptable (cache stays valid slightly longer)
-- False positives are impossible (hash always changes on actual edits)
+**Why this matters:**
+
+- The statusline can request an accurate count and continue rendering without waiting. The result arrives asynchronously and the statusline updates on the next redraw via the cache.
+- `vim.schedule()` is essential: callbacks from `vim.system` may run in a "fast event context" where most Vimscript functions error out. Scheduling defers the callback to the next event-loop tick where it's safe.
+- Temp file cleanup happens inside the callback so the file lives long enough for Pandoc to read it. An early-return path (filter missing) also cleans up to avoid leaks.
 
 ## 3. Auto-Detection via Introspection
 
@@ -241,290 +219,3 @@ end
 - Zero migration effort for existing users
 - New users can use modern API
 - Deprecation path for future versions
-
-## 6. Async-First API Design
-
-**Problem:** Pandoc execution blocks Neovim UI.
-
-**Traditional Solution:** Run synchronously, accept UI freeze.
-
-**Our Innovation:** Async-first with `vim.system()`.
-
-```lua
-function M.get_metrics(bufnr, mode, callback)
-  -- ... validation ...
-
-  local temp_file = utils.write_temp_file(content)
-
-  -- Async execution - doesn't block UI
-  utils.run_pandoc(temp_file, mode, function(success, result)
-    utils.cleanup_temp_file(temp_file)
-
-    if success then
-      local data = utils.parse_output(result)
-      cache.set(bufnr, mode, data)
-      callback(true, data)
-    else
-      callback(false, result)
-    end
-  end)
-
-  -- Returns immediately, callback fires when done
-end
-```
-
-**Benefits:**
-- UI never freezes during computation
-- Users can continue editing while metrics compute
-- Statusline shows "…" placeholder during computation
-
-**Promise-Style Alternative:**
-
-```lua
--- Traditional callback style
-M.get_metrics(0, "full", function(success, data)
-  if success then
-    print(data.words)
-  end
-end)
-
--- Promise-style alternative
-M.get_metrics_async(0, "full")
-  .after(
-    function(data) print(data.words) end,
-    function(err) print("Error: " .. err) end
-  )
-```
-
-## 7. Intelligent Default Configuration
-
-**Problem:** Users need to configure many settings for optimal experience.
-
-**Traditional Solution:** Minimal defaults, extensive documentation.
-
-**Our Innovation:** Smart defaults based on use cases.
-
-```lua
-M.defaults = {
-  cache = {
-    basic_ttl = 500,    -- 500ms = 2 updates/second (smooth statusline)
-    full_ttl = 30000,   -- 30s = long enough to avoid redundant computation
-  },
-  filetypes = {
-    "markdown", "text", "tex", "fountain", "org", "asciidoc", "rst"
-  },
-  targets = {
-    grant = {
-      flesch_kincaid = { min = 11, max = 14 },  -- College-level clarity
-      passive_voice = { max = 10 },             -- < 10% passive
-    },
-    creative = {
-      flesch_kincaid = { min = 7, max = 9 },    -- General audience
-      sentence_variability = { min = 8 },        -- High variety
-    },
-  },
-}
-```
-
-**Rationale:**
-
-- **basic_ttl = 500ms:** Balances responsiveness with computation cost
-  - < 500ms: Too frequent, wastes CPU
-  - > 1000ms: Feels laggy to users
-  - 500ms: Optimal perceptual responsiveness
-
-- **full_ttl = 30s:** Assumes users review reports for 30s before editing
-  - < 10s: Too short, redundant recomputation
-  - > 60s: Too long, stale data
-  - 30s: Typical report review time
-
-- **Filetypes:** Based on survey of writing tools
-  - Markdown: Most common
-  - Text: Plain writing
-  - TeX/LaTeX: Academic papers
-  - Fountain: Screenplays
-  - Org: Emacs users
-  - AsciiDoc: Technical docs
-  - reStructuredText: Python docs
-
-## 8. Progressive Enhancement
-
-**Problem:** Plugin should work even if Pandoc is missing features.
-
-**Traditional Solution:** All-or-nothing (either works perfectly or fails).
-
-**Our Innovation:** Feature detection and graceful degradation.
-
-```lua
-M.defaults = {
-  features = {
-    basic = true,              -- Always available
-    readability = true,        -- Requires syllable counting
-    passive_voice = true,      -- Requires pattern matching
-    nominalizations = true,    -- Requires word analysis
-    vocabulary = true,         -- Requires unique word tracking
-    sentence_variety = true,   -- Requires length tracking
-    ai_words = true,           -- Requires dictionary lookup
-  },
-}
-
--- User can disable features if they cause issues
-require("writing-metrics").setup({
-  features = {
-    readability = false,  -- Disable if syllable counting is slow
-  }
-})
-```
-
-**Future Enhancement:** Automatic feature detection based on Pandoc version.
-
-## 9. Comprehensive Error Context
-
-**Problem:** Generic error messages are hard to debug.
-
-**Traditional Solution:** "An error occurred"
-
-**Our Innovation:** Context-aware error messages with solutions.
-
-```lua
--- Bad
-if not ok then
-  return false, "Error"
-end
-
--- Good
-if vim.fn.executable("pandoc") ~= 1 then
-  return false, [[
-Pandoc not found in PATH. Please install Pandoc >= 2.19.
-
-Installation instructions:
-  Ubuntu/Debian:  sudo apt install pandoc
-  Arch Linux:     sudo pacman -S pandoc
-  macOS:          brew install pandoc
-  Windows:        choco install pandoc
-
-After installation, restart Neovim.
-]]
-end
-```
-
-**Error Context Includes:**
-
-1. **What went wrong:** "Pandoc not found"
-2. **Why it matters:** "Required for metrics computation"
-3. **How to fix:** Platform-specific installation commands
-4. **Next steps:** "Restart Neovim"
-
-## 10. Memory-Safe Cache Management
-
-**Problem:** Cache entries for deleted buffers leak memory.
-
-**Traditional Solution:** Manual cleanup or ignore the problem.
-
-**Our Innovation:** Automatic cleanup with periodic validation.
-
-```lua
--- Autocmd: Clean up immediately on buffer delete
-vim.api.nvim_create_autocmd("BufDelete", {
-  callback = function(args)
-    cache.invalidate(args.buf)
-  end,
-})
-
--- Timer: Periodic cleanup of stale entries (every 5 minutes)
-local timer = vim.loop.new_timer()
-timer:start(300000, 300000, vim.schedule_wrap(function()
-  M.cleanup_stale_entries()
-end))
-
-function M.cleanup_stale_entries()
-  local valid_buffers = {}
-  for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
-    if vim.api.nvim_buf_is_valid(bufnr) then
-      valid_buffers[bufnr] = true
-    end
-  end
-
-  for bufnr in pairs(cache.basic) do
-    if not valid_buffers[bufnr] then
-      cache.basic[bufnr] = nil
-    end
-  end
-
-  for bufnr in pairs(cache.full) do
-    if not valid_buffers[bufnr] then
-      cache.full[bufnr] = nil
-    end
-  end
-end
-```
-
-**Benefits:**
-- No memory leaks
-- Automatic cleanup
-- Minimal overhead (runs every 5 minutes)
-
-## Performance Summary
-
-| Innovation | Improvement |
-|------------|-------------|
-| Smart cache extraction | 97% reduction in Pandoc executions |
-| Content-based invalidation | 90% fewer cache invalidations |
-| Auto-detection | Zero configuration for 99% of users |
-| Lazy module loading | 30x faster startup (15ms → 0.5ms) |
-| Async-first API | Zero UI blocking |
-| Memory-safe caching | Zero memory leaks |
-
-## Testing Innovations
-
-All innovations are validated by the test suite:
-
-```bash
-nvim -l test_core_modules.lua
-```
-
-**Tests:**
-1. Auto-detection finds bundled filter
-2. Content hashing detects changes
-3. Cache statistics track memory usage
-4. Lazy loading defers module imports
-5. Backward compatibility shims exist
-6. Async API doesn't block
-7. Memory cleanup runs correctly
-
-## Lessons Learned
-
-### What Worked Well
-
-1. **Smart cache extraction:** Biggest performance win, invisible to users
-2. **Content hashing:** Eliminates redundant invalidations elegantly
-3. **Lazy loading:** Significant startup improvement for minimal code
-4. **Global shims:** Made migration painless for existing users
-
-### What Could Be Improved
-
-1. **Hash algorithm:** Could use first/middle/last chunks for better collision resistance
-2. **Cache cleanup frequency:** 5 minutes might be too aggressive for some users
-3. **Error messages:** Could include more contextual debugging info
-4. **Feature detection:** Currently manual, could be automatic based on Pandoc version
-
-### Future Enhancements
-
-1. **Incremental updates:** Only recompute changed paragraphs
-2. **Background pre-computation:** Predict when user will request metrics
-3. **Persistent cache:** Survive Neovim restarts
-4. **Diff-based invalidation:** Use buffer change events for smarter invalidation
-5. **WebAssembly filter:** Eliminate Pandoc dependency entirely
-
-## Conclusion
-
-These innovations make nvim-writing-metrics:
-
-- **Fast:** 97% reduction in computation overhead
-- **Responsive:** < 0.1ms cache hits, async computation
-- **User-friendly:** Zero configuration, helpful errors
-- **Maintainable:** Modular design, comprehensive tests
-- **Compatible:** Works with existing configurations
-- **Reliable:** Memory-safe, graceful degradation
-
-The core modules provide a solid foundation for the remaining tracks (Display, Commands, Integration, Testing, Documentation).
