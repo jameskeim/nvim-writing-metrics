@@ -349,6 +349,107 @@ describe("writing-metrics.basic", function()
     end)
   end)
 
+  describe("statusline_reading_time_suffix", function()
+    it("includes silent profile suffix when statusline_profile = 'silent'", function()
+      local config = require("writing-metrics.config")
+      local saved = vim.deepcopy(config.config.reading_time or {})
+      config.config.reading_time = vim.tbl_extend("force", saved, {
+        enabled = true,
+        statusline = true,
+        statusline_profile = "silent",
+      })
+
+      local bufnr = helpers.create_test_buffer("placeholder")
+      vim.bo[bufnr].filetype = "markdown"
+      vim.api.nvim_set_current_buf(bufnr)
+      cache.set_basic(bufnr, { words = 400, chars = 1500, sentences = 20, paragraphs = 4 })
+
+      -- Use fast mode so get_statusline_string returns a table with text field
+      basic.statusline_mode = "fast"
+      local result = basic.get_statusline_string(bufnr)
+      assert.is_table(result)
+      assert.is_string(result.text)
+      -- 400 / 200 wpm = 2.0 → ceil = 2 silent minutes
+      assert.is_truthy(result.text:find("⏱", 1, true))
+      assert.is_truthy(result.text:find("~2 min", 1, true))
+
+      config.config.reading_time = saved
+    end)
+
+    it("includes spoken profile suffix when statusline_profile = 'spoken'", function()
+      local config = require("writing-metrics.config")
+      local saved = vim.deepcopy(config.config.reading_time or {})
+      config.config.reading_time = vim.tbl_extend("force", saved, {
+        enabled = true,
+        statusline = true,
+        statusline_profile = "spoken",
+      })
+
+      local bufnr = helpers.create_test_buffer("placeholder")
+      vim.bo[bufnr].filetype = "markdown"
+      vim.api.nvim_set_current_buf(bufnr)
+      cache.set_basic(bufnr, { words = 400, chars = 1500, sentences = 20, paragraphs = 4 })
+
+      basic.statusline_mode = "fast"
+      local result = basic.get_statusline_string(bufnr)
+      assert.is_table(result)
+      assert.is_string(result.text)
+      -- 400 / 150 wpm = 2.67 → ceil = 3 spoken minutes
+      assert.is_truthy(result.text:find("🎤", 1, true))
+      assert.is_truthy(result.text:find("~3 min", 1, true))
+
+      config.config.reading_time = saved
+    end)
+
+    it("includes both profiles suffix when statusline_profile = 'both'", function()
+      local config = require("writing-metrics.config")
+      local saved = vim.deepcopy(config.config.reading_time or {})
+      config.config.reading_time = vim.tbl_extend("force", saved, {
+        enabled = true,
+        statusline = true,
+        statusline_profile = "both",
+      })
+
+      local bufnr = helpers.create_test_buffer("placeholder")
+      vim.bo[bufnr].filetype = "markdown"
+      vim.api.nvim_set_current_buf(bufnr)
+      cache.set_basic(bufnr, { words = 400, chars = 1500, sentences = 20, paragraphs = 4 })
+
+      basic.statusline_mode = "fast"
+      local result = basic.get_statusline_string(bufnr)
+      assert.is_table(result)
+      assert.is_string(result.text)
+      -- silent: ~2 min, spoken: ~3 min → compact form "~2/~3 min"
+      assert.is_truthy(result.text:find("⏱", 1, true))
+      assert.is_truthy(result.text:find("~2/~3 min", 1, true))
+
+      config.config.reading_time = saved
+    end)
+
+    it("omits reading time when statusline is disabled", function()
+      local config = require("writing-metrics.config")
+      local saved = vim.deepcopy(config.config.reading_time or {})
+      config.config.reading_time = vim.tbl_extend("force", saved, {
+        enabled = true,
+        statusline = false,
+      })
+
+      local bufnr = helpers.create_test_buffer("placeholder")
+      vim.bo[bufnr].filetype = "markdown"
+      vim.api.nvim_set_current_buf(bufnr)
+      cache.set_basic(bufnr, { words = 400, chars = 1500, sentences = 20, paragraphs = 4 })
+
+      basic.statusline_mode = "fast"
+      local result = basic.get_statusline_string(bufnr)
+      assert.is_table(result)
+      assert.is_string(result.text)
+      assert.is_falsy(result.text:find("⏱", 1, true))
+      assert.is_falsy(result.text:find("🎤", 1, true))
+
+      config.config.reading_time = saved
+    end)
+  end)
+
   describe("edge cases", function()
     it("handles invalid buffer", function()
       local result = basic.get_fast_count(-1)
