@@ -3,17 +3,32 @@
 --- @module writing-metrics.display
 local M = {}
 
+--- Normalize a buffer's identity into a stable tracking key for the reports table.
+--- Named buffers → absolute resolved path (handles relative paths and symlinks).
+--- Unnamed buffers → "unnamed:<bufnr>" so they can still regenerate in place.
+--- @param bufnr number Buffer number
+--- @return string|nil Stable key, or nil if bufnr is invalid
+local function tracking_key(bufnr)
+  if not bufnr or not vim.api.nvim_buf_is_valid(bufnr) then
+    return nil
+  end
+  local name = vim.api.nvim_buf_get_name(bufnr)
+  if name == "" then
+    return "unnamed:" .. tostring(bufnr)
+  end
+  return vim.fn.fnamemodify(name, ":p")
+end
+
 --- Find existing report buffer for a source buffer
 --- @param source_bufnr number Source buffer number
 --- @return number|nil Report buffer number if exists and valid
 function M.find_existing_report(source_bufnr)
-  -- Use filepath as key, not buffer number (buffers can be reused for different files)
-  local source_filepath = vim.api.nvim_buf_get_name(source_bufnr)
-  if source_filepath == "" then
-    return nil  -- Unnamed buffers don't get tracked
+  local key = tracking_key(source_bufnr)
+  if not key then
+    return nil
   end
 
-  local report_bufnr = _G.writing_metrics_reports[source_filepath]
+  local report_bufnr = _G.writing_metrics_reports[key]
 
   if report_bufnr and vim.api.nvim_buf_is_valid(report_bufnr) then
     return report_bufnr
@@ -21,7 +36,7 @@ function M.find_existing_report(source_bufnr)
 
   -- Clean up stale reference
   if report_bufnr then
-    _G.writing_metrics_reports[source_filepath] = nil
+    _G.writing_metrics_reports[key] = nil
   end
 
   return nil
@@ -741,10 +756,10 @@ function M.create_report_buffer(lines, opts)
     local buffer_name = M.generate_report_name(source_bufnr)
     vim.api.nvim_buf_set_name(bufnr, buffer_name)
 
-    -- Store mapping in global tracking table (use filepath as key)
-    local source_filepath = vim.api.nvim_buf_get_name(source_bufnr)
-    if source_filepath ~= "" then
-      _G.writing_metrics_reports[source_filepath] = bufnr
+    -- Store mapping in global tracking table (use normalized key)
+    local key = tracking_key(source_bufnr)
+    if key then
+      _G.writing_metrics_reports[key] = bufnr
     end
   end
 

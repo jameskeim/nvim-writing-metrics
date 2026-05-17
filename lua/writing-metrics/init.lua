@@ -4,7 +4,8 @@
 local M = {}
 
 --- Global tracking table for report buffers
---- Maps source_filepath → report_bufnr
+--- Keys are normalized: absolute resolved path for named buffers,
+--- "unnamed:<bufnr>" for unnamed buffers (see display.tracking_key).
 --- @type table<string, number>
 _G.writing_metrics_reports = _G.writing_metrics_reports or {}
 
@@ -55,10 +56,18 @@ function M.setup(opts)
       callback = function(args)
         local bufnr = args.buf
 
-        -- If this is a source buffer, remove its report mapping (by filepath)
-        local filepath = vim.api.nvim_buf_get_name(bufnr)
-        if filepath ~= "" and _G.writing_metrics_reports[filepath] then
-          _G.writing_metrics_reports[filepath] = nil
+        -- If this is a source buffer, remove its report mapping (by normalized key).
+        -- Use the same normalization as display.tracking_key: absolute path for named
+        -- buffers, "unnamed:<bufnr>" sentinel for unnamed buffers.
+        local name = vim.api.nvim_buf_is_valid(bufnr) and vim.api.nvim_buf_get_name(bufnr) or ""
+        local key
+        if name ~= "" then
+          key = vim.fn.fnamemodify(name, ":p")
+        else
+          key = "unnamed:" .. tostring(bufnr)
+        end
+        if _G.writing_metrics_reports[key] then
+          _G.writing_metrics_reports[key] = nil
         end
 
         -- If this is a report buffer, remove all mappings pointing to it
