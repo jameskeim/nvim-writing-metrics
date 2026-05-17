@@ -36,4 +36,40 @@ describe("writing-metrics.display", function()
         "rendered output should not contain 'inf'; got: " .. rendered)
     end)
   end)
+
+  describe("section navigation data", function()
+    it("M.SECTIONS has 8 entries with unique keys, icons, and names", function()
+      assert.is_table(display.SECTIONS)
+      assert.equals(8, #display.SECTIONS)
+
+      local keys, icons, names = {}, {}, {}
+      for _, s in ipairs(display.SECTIONS) do
+        assert.is_string(s.key, "section needs string key")
+        assert.is_string(s.icon, "section needs string icon")
+        assert.is_string(s.name, "section needs string name")
+        assert.is_string(s.title, "section needs string title")
+        assert.is_nil(keys[s.key], "duplicate key: " .. s.key)
+        assert.is_nil(icons[s.icon], "duplicate icon: " .. s.icon)
+        assert.is_nil(names[s.name], "duplicate name: " .. s.name)
+        keys[s.key], icons[s.icon], names[s.name] = true, true, true
+      end
+    end)
+
+    it("section_heading returns '## <icon> <title>' that matches the keymap pattern", function()
+      for _, s in ipairs(display.SECTIONS) do
+        local heading = display.section_heading(s.name)
+        assert.equals("## " .. s.icon .. " " .. s.title, heading,
+          "section_heading(" .. s.name .. ") should produce expected line")
+        -- The keymap is /^## <icon><CR>. Verify the heading line matches.
+        assert.is_truthy(heading:find("^## " .. s.icon, 1, false),
+          "heading should match navigation pattern for key " .. s.key)
+      end
+    end)
+
+    it("section_heading errors on unknown name", function()
+      assert.has.errors(function()
+        display.section_heading("nonexistent_section")
+      end)
+    end)
+  end)
 end)

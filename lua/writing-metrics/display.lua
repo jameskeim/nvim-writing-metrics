@@ -3,6 +3,41 @@
 --- @module writing-metrics.display
 local M = {}
 
+--- Section metadata: single source of truth for both the rendered
+--- report headings and the section-jump keymaps. Keep these in
+--- 1:1 correspondence so the keymap regex (/^## <icon><CR>) always
+--- matches the heading emitted by the formatter for that section.
+--- @type table<integer, { name: string, key: string, icon: string, title: string }>
+M.SECTIONS = {
+  { name = "basic",            key = "1", icon = "📊", title = "Basic Statistics" },
+  { name = "readability",      key = "2", icon = "📖", title = "Readability Scores" },
+  { name = "length",           key = "3", icon = "📝", title = "Sentence Length Variety" },
+  { name = "beginnings",       key = "4", icon = "🎯", title = "Sentence Beginning Variety" },
+  { name = "passive",          key = "5", icon = "🔍", title = "Passive Voice Analysis" },
+  { name = "nominalizations",  key = "6", icon = "📐", title = "Nominalization Analysis" },
+  { name = "vocabulary",       key = "7", icon = "📚", title = "Vocabulary Richness" },
+  { name = "ai_style",         key = "8", icon = "🤖", title = "AI-Style Detection" },
+}
+
+-- Build name -> section lookup for fast access by section_heading().
+local _sections_by_name = {}
+for _, s in ipairs(M.SECTIONS) do
+  _sections_by_name[s.name] = s
+end
+
+--- Build the markdown heading line for a named section.
+--- The returned string is what the formatters emit AND what the
+--- navigation keymaps search for, so both stay coupled to M.SECTIONS.
+--- @param name string Section name (see M.SECTIONS entries)
+--- @return string "## <icon> <title>"
+function M.section_heading(name)
+  local section = _sections_by_name[name]
+  if not section then
+    error("Unknown section name: " .. tostring(name))
+  end
+  return string.format("## %s %s", section.icon, section.title)
+end
+
 --- Normalize a buffer's identity into a stable tracking key for the reports table.
 --- Named buffers → absolute resolved path (handles relative paths and symlinks).
 --- Unnamed buffers → "unnamed:<bufnr>" so they can still regenerate in place.
@@ -170,7 +205,7 @@ function M.format_basic_section(basic)
   local utils = require("writing-metrics.utils")
 
   table.insert(lines, "")
-  table.insert(lines, "## 📊 Basic Statistics")
+  table.insert(lines, M.section_heading("basic"))
   table.insert(lines, "")
   table.insert(lines, string.format("| Metric | Value |"))
   table.insert(lines, string.format("|--------|-------|"))
@@ -221,7 +256,7 @@ function M.format_readability_section(readability, basic)
   local lines = {}
 
   table.insert(lines, "")
-  table.insert(lines, "## 📖 Readability Scores")
+  table.insert(lines, M.section_heading("readability"))
   table.insert(lines, "")
 
   -- Table header
@@ -299,7 +334,7 @@ function M.format_sentence_variety_section(variability)
   local utils = require("writing-metrics.utils")
 
   table.insert(lines, "")
-  table.insert(lines, "## 📝 Sentence Length Variety")
+  table.insert(lines, M.section_heading("length"))
   table.insert(lines, "")
 
   table.insert(lines, "| Metric | Value |")
@@ -422,7 +457,7 @@ function M.format_sentence_beginnings_section(beginnings, basic)
   local lines = {}
 
   table.insert(lines, "")
-  table.insert(lines, "## 🎯 Sentence Beginning Variety")
+  table.insert(lines, M.section_heading("beginnings"))
   table.insert(lines, "")
 
   table.insert(lines, "Distribution of how sentences start:")
@@ -504,7 +539,7 @@ function M.format_passive_voice_section(passive_voice)
   local utils = require("writing-metrics.utils")
 
   table.insert(lines, "")
-  table.insert(lines, "## 🔍 Passive Voice Analysis")
+  table.insert(lines, M.section_heading("passive"))
   table.insert(lines, "")
 
   local count = passive_voice.count or 0
@@ -541,7 +576,7 @@ function M.format_nominalization_section(nominalizations)
   local utils = require("writing-metrics.utils")
 
   table.insert(lines, "")
-  table.insert(lines, "## 📐 Nominalization Analysis")
+  table.insert(lines, M.section_heading("nominalizations"))
   table.insert(lines, "")
 
   local count = nominalizations.count or 0
@@ -598,7 +633,7 @@ function M.format_vocabulary_section(vocabulary)
   local utils = require("writing-metrics.utils")
 
   table.insert(lines, "")
-  table.insert(lines, "## 📚 Vocabulary Richness")
+  table.insert(lines, M.section_heading("vocabulary"))
   table.insert(lines, "")
 
   local total = vocabulary.total_words or 0
@@ -670,7 +705,7 @@ function M.format_ai_style_section(ai_style, basic)
   local lines = {}
 
   table.insert(lines, "")
-  table.insert(lines, "## 🤖 AI-Style Detection")
+  table.insert(lines, M.section_heading("ai_style"))
   table.insert(lines, "")
 
   local word_counts = ai_style.word_counts or {}
@@ -789,6 +824,8 @@ function M.create_report_buffer(lines, opts)
 end
 
 --- Setup keymaps for navigating the report
+--- Section-jump keymaps are derived from M.SECTIONS so icon/key
+--- changes in one place automatically propagate to the other.
 --- @param bufnr number Buffer number
 function M.setup_report_keymaps(bufnr)
   local opts = { buffer = bufnr, silent = true, nowait = true }
@@ -798,15 +835,11 @@ function M.setup_report_keymaps(bufnr)
   -- <Esc> intentionally NOT mapped: users press it reflexively for unrelated
   -- reasons (clearing search highlight, breaking out of pending ops). Use q.
 
-  -- Jump to sections
-  vim.keymap.set("n", "1", "/^## 📊<CR>:nohlsearch<CR>", opts)
-  vim.keymap.set("n", "2", "/^## 📖<CR>:nohlsearch<CR>", opts)
-  vim.keymap.set("n", "3", "/^## 📝<CR>:nohlsearch<CR>", opts)
-  vim.keymap.set("n", "4", "/^## 🎯<CR>:nohlsearch<CR>", opts)
-  vim.keymap.set("n", "5", "/^## 🔍<CR>:nohlsearch<CR>", opts)
-  vim.keymap.set("n", "6", "/^## 📐<CR>:nohlsearch<CR>", opts)
-  vim.keymap.set("n", "7", "/^## 📚<CR>:nohlsearch<CR>", opts)
-  vim.keymap.set("n", "8", "/^## 🤖<CR>:nohlsearch<CR>", opts)
+  -- Jump to sections (derived from M.SECTIONS)
+  for _, section in ipairs(M.SECTIONS) do
+    local cmd = string.format("/^## %s<CR>:nohlsearch<CR>", section.icon)
+    vim.keymap.set("n", section.key, cmd, opts)
+  end
 end
 
 --- ============================================================================
