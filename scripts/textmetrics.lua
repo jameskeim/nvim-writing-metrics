@@ -1098,7 +1098,10 @@ function Pandoc(el)
     print(json.encode(output))
   end
 
-  os.exit(0)
+  -- Return an empty Pandoc document instead of os.exit(0).
+  -- os.exit aborted Pandoc's plain writer mid-render, producing a
+  -- cosmetic table.concat error on stderr.
+  return pandoc.Pandoc({}, el.meta)
 end
 
 -- ═══════════════════════════════════════════════════════════════

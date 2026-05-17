@@ -293,4 +293,31 @@ Conclusions remain controversial.
       assert.is_true(result_data == nil or type(result_data) == "table")
     end)
   end)
+
+  describe("filter exits cleanly", function()
+    it("does not write cosmetic table.concat error to stderr", function()
+      helpers.skip_without_pandoc()
+
+      local temp_md = vim.fn.tempname() .. ".md"
+      local f = io.open(temp_md, "w")
+      f:write("# Test\n\nA paragraph with words.\n")
+      f:close()
+
+      local filter = vim.fn.fnamemodify("scripts/textmetrics.lua", ":p")
+
+      local result = vim.system({
+        "pandoc", temp_md,
+        "--lua-filter", filter,
+        "-M", "metrics=basic",
+        "-t", "plain",
+      }, { text = true }):wait()
+
+      vim.fn.delete(temp_md)
+
+      assert.equals(0, result.code, "pandoc should exit 0, got: " .. tostring(result.code))
+      local stderr = result.stderr or ""
+      assert.is_nil(stderr:find("table.concat", 1, true),
+        "stderr should not contain table.concat error; got: " .. stderr)
+    end)
+  end)
 end)
