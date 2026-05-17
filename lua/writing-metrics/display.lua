@@ -103,13 +103,13 @@ end
 --- @param lines table New content lines
 function M.update_report_buffer(report_bufnr, lines)
   -- Make buffer temporarily modifiable
-  vim.api.nvim_buf_set_option(report_bufnr, "modifiable", true)
+  vim.api.nvim_set_option_value("modifiable", true, { buf = report_bufnr })
 
   -- Replace all content
   vim.api.nvim_buf_set_lines(report_bufnr, 0, -1, false, lines)
 
   -- Restore unmodifiable state
-  vim.api.nvim_buf_set_option(report_bufnr, "modifiable", false)
+  vim.api.nvim_set_option_value("modifiable", false, { buf = report_bufnr })
 end
 
 --- Format the complete comprehensive report
@@ -802,10 +802,10 @@ function M.create_report_buffer(lines, opts)
   vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
 
   -- Set buffer options
-  vim.api.nvim_buf_set_option(bufnr, "filetype", "markdown")
-  vim.api.nvim_buf_set_option(bufnr, "buftype", "nofile")
-  vim.api.nvim_buf_set_option(bufnr, "bufhidden", "hide")  -- Keep buffer when hidden (multiple reports)
-  vim.api.nvim_buf_set_option(bufnr, "modifiable", false)
+  vim.api.nvim_set_option_value("filetype", "markdown", { buf = bufnr })
+  vim.api.nvim_set_option_value("buftype", "nofile", { buf = bufnr })
+  vim.api.nvim_set_option_value("bufhidden", "hide", { buf = bufnr })  -- Keep buffer when hidden (multiple reports)
+  vim.api.nvim_set_option_value("modifiable", false, { buf = bufnr })
 
   -- Set unique buffer name based on source
   if source_bufnr then
