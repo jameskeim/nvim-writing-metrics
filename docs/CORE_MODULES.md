@@ -17,7 +17,7 @@ nvim-writing-metrics/
 
 ## Module Descriptions
 
-### 1. `init.lua` - Main Entry Point (516 lines)
+### 1. `init.lua` - Main Entry Point
 
 The public API module that provides all user-facing functionality.
 
@@ -41,7 +41,7 @@ The public API module that provides all user-facing functionality.
 
 **Auto-initialization:** The module auto-initializes on first require if not explicitly setup.
 
-### 2. `config.lua` - Configuration & Auto-Detection (248 lines)
+### 2. `config.lua` - Configuration & Auto-Detection
 
 Handles configuration management and automatic detection of dependencies.
 
@@ -68,10 +68,6 @@ The module finds the bundled Pandoc filter using a fallback chain:
 
 ```lua
 M.defaults = {
-  cache = {
-    basic_ttl = 500,    -- 500ms for statusline (fast updates)
-    full_ttl = 30000,   -- 30s for full reports (reduce computation)
-  },
   features = {
     basic = true,
     readability = true,
@@ -107,9 +103,9 @@ M.defaults = {
 }
 ```
 
-### 3. `cache.lua` - Intelligent Shared Caching (302 lines)
+### 3. `cache.lua` - Per-Buffer Statusline Cache
 
-Implements a two-tier caching system with smart fallback logic.
+A single-tier per-buffer cache for basic metrics, validated against Neovim's `b:changedtick`. Full readability reports are never cached — they always compute fresh.
 
 **Cache Structure:**
 
@@ -117,57 +113,49 @@ Implements a two-tier caching system with smart fallback logic.
 cache = {
   basic = {
     [bufnr] = {
-      content_hash = "...",  -- Hash for invalidation
-      timestamp = os.time(),
-      data = { words = 1247, chars = 7892, ... }
-    }
-  },
-  full = {
-    [bufnr] = {
-      content_hash = "...",
-      timestamp = os.time(),
-      data = { basic = {...}, readability = {...}, ... }
+      changedtick = 42,        -- Snapshot of b:changedtick when cached
+      timestamp = now(),       -- Wall-clock time (for stats only)
+      data = { words = 1247, chars = 7892, ... },
+      stale = false,           -- True if marked stale pending recompute
     }
   }
 }
 ```
 
-**Smart Cache Logic:**
+**Validation Logic:**
 
-The cache implements an intelligent optimization:
+`M.content_changed(bufnr)` compares the current `vim.b[bufnr].changedtick` against the snapshot stored in the cache entry. The tick is an integer maintained by Neovim that increments on every buffer modification (edit, undo, paste) and never on cursor movement, mode changes, or window operations.
 
-1. Check basic cache first (500ms TTL)
-2. If basic cache expired, check full cache (30s TTL)
-3. **If full cache is still valid, extract basic metrics from it** (avoids recomputation!)
-4. Only recompute if both caches are invalid
-
-This means:
-- Statusline updates every 500ms with fresh data (responsive)
-- Full reports cached for 30s (reduces Pandoc executions)
-- Basic metrics often extracted from full cache (free optimization)
+- Cache hit: same tick → return the cached data immediately.
+- Cache miss / stale: tick differs → recompute (async) and return the previous data marked `stale=true` so the statusline can show the last known count while updating.
 
 **Key Functions:**
 
-- `M.get_basic(bufnr)` - Get basic metrics with smart fallback to full cache
-- `M.get_full(bufnr)` - Get full metrics from cache
-- `M.set_basic(bufnr, data)` - Store basic metrics
-- `M.set_full(bufnr, data)` - Store full metrics (also caches extracted basic metrics)
-- `M.invalidate(bufnr)` - Clear all caches for buffer
-- `M.is_valid(entry, ttl)` - Check if cache entry is still valid
-- `M.content_changed(bufnr)` - Check if content changed since last cache
-- `M.setup_autocmds()` - Setup automatic cache invalidation
-- `M.cleanup_stale_entries()` - Remove entries for deleted buffers
+- `M.get_basic(bufnr)` - Return cached basic metrics and a stale flag
+- `M.set_basic(bufnr, data)` - Store basic metrics with the current changedtick
+- `M.invalidate(bufnr)` - Mark an entry stale (preserves last-known data for display)
+- `M.remove(bufnr)` - Drop the entry entirely
+- `M.clear_all()` - Drop all entries
+- `M.content_changed(bufnr)` - True if `b:changedtick` differs from the cached tick
+- `M.get_stats()` / `M.get_statistics()` - Counters for cache-monitoring commands
+- `M.setup_autocmds()` - Wire up cache-invalidation autocmds
+- `M.cleanup_stale_entries()` - Drop entries for buffers that no longer exist
+- `M.inspect(bufnr)` - Diagnostic dump for a single buffer
 
 **Automatic Invalidation:**
 
-The cache is automatically invalidated on:
-- `TextChanged`, `TextChangedI`, `InsertLeave` - Only if content actually changed
-- `BufWritePost` - Ensures metrics reflect saved state
-- `BufDelete` - Prevents memory leaks
+Autocmds drive cache-invalidation attempts:
+- `TextChanged`, `TextChangedI`, `InsertLeave` — recompute on actual content changes
+- `BufWritePost` — ensure metrics reflect the saved state
+- `BufDelete` — drop the entry to prevent leaks
 
-Periodic cleanup runs every 5 minutes to remove stale entries.
+A periodic timer (every 5 minutes) calls `cleanup_stale_entries` as a safety net for buffers that left without firing `BufDelete`.
 
-### 4. `utils.lua` - Shared Utilities (378 lines)
+**What's NOT cached:**
+
+`M.show_full_report` always recomputes via `full.get_full_metrics`. Reports are user-triggered (`<leader>mr`) and benefit from up-to-date output more than from cache reuse.
+
+### 4. `utils.lua` - Shared Utilities
 
 Provides utility functions used across all modules.
 
@@ -206,10 +194,6 @@ Provides utility functions used across all modules.
 - `M.validate_pandoc()` - Check Pandoc availability
 - `M.validate_filter()` - Check filter exists
 
-**Cache Support:**
-
-- `M.get_content_hash(bufnr)` - Generate simple content hash for invalidation
-
 ## Design Decisions
 
 ### 1. Lazy Loading
@@ -224,40 +208,26 @@ end
 
 This minimizes startup time and only loads what's needed.
 
-### 2. Content Hashing for Cache Invalidation
+### 2. Changedtick-Based Cache Validation
 
-Instead of invalidating cache on every cursor movement, we hash buffer content:
-
-```lua
-function M.get_content_hash(bufnr)
-  local content = M.get_buffer_content(bufnr)
-  local len = #content
-  local first = content:sub(1, 100)
-  local last = content:sub(-100)
-  return string.format("%d:%s:%s", len, first, last)
-end
-```
-
-This is fast (no crypto overhead) and catches actual content changes.
-
-### 3. Smart Cache Extraction
-
-When basic cache expires but full cache is still valid, extract basic metrics:
+The cache uses Neovim's built-in `b:changedtick` to decide whether the stored basic metrics are still valid:
 
 ```lua
-local full_entry = cache.full[bufnr]
-if full_entry and full_entry.content_hash == current_hash and M.is_valid(full_entry, full_ttl) then
-  local basic_data = extract_basic_from_full(full_entry.data)
-  if basic_data then
-    cache.basic[bufnr] = { ... }
-    return basic_data
+function M.content_changed(bufnr)
+  if not vim.api.nvim_buf_is_valid(bufnr) then
+    return true
   end
+  local tick = vim.b[bufnr].changedtick
+  local entry = cache.basic[bufnr]
+  return not entry or entry.changedtick ~= tick
 end
 ```
 
-This provides the best of both worlds: fast statusline updates without redundant computation.
+`b:changedtick` is maintained by Neovim — it increments on every actual buffer modification and doesn't move on cursor or window events. Comparing two integers is faster than hashing buffer content and avoids the false invalidations a naive autocmd-based scheme would suffer.
 
-### 4. Async Execution
+Full reports are not cached at all (see the cache.lua "What's NOT cached" note above): they're user-triggered and benefit more from fresh output than from cache reuse.
+
+### 3. Async Execution
 
 Pandoc runs asynchronously using `vim.system()`:
 
@@ -269,7 +239,7 @@ end)
 
 This prevents UI blocking during metrics computation.
 
-### 5. Graceful Degradation
+### 4. Graceful Degradation
 
 If Pandoc is missing or filter not found, the plugin provides helpful error messages:
 
@@ -287,7 +257,7 @@ Installation instructions:
 end
 ```
 
-### 6. Backward Compatibility
+### 5. Backward Compatibility
 
 Global shims ensure existing configurations continue working:
 
@@ -302,29 +272,27 @@ end
 
 ## Testing
 
-Run the comprehensive test suite:
+Run the spec suite with plenary.busted:
 
 ```bash
 cd ~/projects/nvim-writing-metrics
-nvim -l test_core_modules.lua
+./run-tests.sh                          # all specs
+./run-tests.sh -t tests/cache_spec.lua  # one file
 ```
 
-**Tests:**
+**Spec files in `tests/`:**
 
-1. Config module loads
-2. Auto-detect plugin directory
-3. Validate Pandoc installation
-4. Utils module loads
-5. Format utilities work
-6. Cache module loads
-7. Cache statistics
-8. Main module loads
-9. Module initialization
-10. Compatibility shims exist
-11. Statusline component factory
-12. Content hashing
+- `basic_spec.lua` — basic-mode word/char/sentence counting
+- `cache_spec.lua` — cache get/set/invalidate/content_changed
+- `compatibility_spec.lua` — legacy `_G.text_metrics` and `_G.accurate_wordcount` shims
+- `config_spec.lua` — default merging, filetype enablement, filter detection
+- `display_spec.lua` — section heading helper, vocabulary div-by-zero guard, formatter output
+- `full_spec.lua` — full-mode JSON parsing, syllable counting, list-paragraph counting
+- `init_spec.lua` — `setup()` behavior (e.g., report-tracking reset on `:Lazy reload`)
+- `integration_spec.lua` — end-to-end setup with user opts
+- `utils_spec.lua` — buffer extraction, temp-file lifecycle, Pandoc invocation
 
-All 12 tests must pass before proceeding to integration.
+A pre-existing failure cluster in `basic_spec.lua` and `full_spec.lua` is tracked separately; the goal for any new work is that the failure count does not increase.
 
 ## Usage Examples
 
@@ -374,10 +342,6 @@ require('lualine').setup({
 
 ```lua
 require("writing-metrics").setup({
-  cache = {
-    basic_ttl = 1000,  -- Update statusline every 1 second
-    full_ttl = 60000,  -- Cache reports for 1 minute
-  },
   filetypes = {
     "markdown", "text", "tex", "org"  -- Only these filetypes
   },
@@ -412,7 +376,7 @@ With core modules complete, the next phases are:
 
 ## Module Statistics
 
-- **Total lines:** 1,444
+- **Total lines (core modules):** ~1,455 across `init.lua`, `config.lua`, `cache.lua`, `utils.lua`
 - **Average complexity:** Moderate (async operations, caching logic)
-- **Test coverage:** 12 tests, 100% pass rate
+- **Test coverage:** see `tests/*_spec.lua` (run via `./run-tests.sh`)
 - **Dependencies:** Neovim 0.10+, Pandoc 2.19+
