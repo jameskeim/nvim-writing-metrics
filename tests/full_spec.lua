@@ -191,6 +191,41 @@ describe("writing-metrics.full", function()
     end)
   end)
 
+  describe("complex word counting - sentence-initial words", function()
+    it("counts sentence-initial polysyllabic words as complex", function()
+      helpers.skip_without_pandoc()
+
+      -- 'Investigation', 'Researchers', 'Conclusions' are sentence-initial AND polysyllabic.
+      -- They should be counted as complex words, not excluded as proper nouns.
+      local content = [[
+Investigation revealed serious problems.
+Researchers conducted careful analysis.
+Conclusions remain controversial.
+]]
+      local bufnr = helpers.create_test_buffer(content)
+      local done, success_flag, result = false, nil, nil
+
+      require("writing-metrics.full").get_full_metrics(bufnr, function(success, data)
+        success_flag = success
+        result = data
+        done = true
+      end)
+
+      helpers.wait_for_async(function() return done end, 5000)
+      assert.is_true(success_flag)
+      assert.is_not_nil(result)
+      assert.is_not_nil(result.readability)
+      assert.is_number(result.readability.complex_words,
+        "expected result.readability.complex_words to be a number")
+      -- All three sentence-initial words ARE polysyllabic. None are proper nouns.
+      -- Expect complex_words >= 3.
+      assert.is_true(
+        result.readability.complex_words >= 3,
+        "expected >=3 complex words, got " .. tostring(result.readability.complex_words)
+      )
+    end)
+  end)
+
   describe("edge cases", function()
     it("handles invalid buffer", function()
       local success = pcall(full.show_report, -1)

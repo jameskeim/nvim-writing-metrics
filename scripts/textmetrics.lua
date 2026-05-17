@@ -252,12 +252,15 @@ end
 
 -- Detect complex words (3+ syllables, for Gunning Fog)
 -- Only used in full mode
-local function is_complex(word, syllables)
+-- is_sent_start: true when the word opens a sentence (capitalized for syntactic reasons,
+-- not because it is a proper noun).
+local function is_complex(word, syllables, is_sent_start)
   -- 3+ syllables = complex
   if syllables < 3 then return false end
 
-  -- Exclude proper nouns (capitalized)
-  if word:match("^%u") then return false end
+  -- Exclude proper nouns (capitalized), but NOT sentence-initial words.
+  -- Sentence-initial words are capitalized by convention; they are not necessarily names.
+  if word:match("^%u") and not is_sent_start then return false end
 
   -- Exclude common suffixes that add syllables but not complexity
   if word:match("ed$") or word:match("es$") or word:match("ing$") then
@@ -736,6 +739,11 @@ wordcount = {
       if analysis_mode == "full" then
         current_sentence_words = current_sentence_words + 1
 
+        -- Capture sentence-start flag BEFORE clearing it so is_complex can use it.
+        -- is_sentence_start is true for the first content token of each sentence;
+        -- those tokens are capitalised for syntactic (not proper-noun) reasons.
+        local word_is_sentence_start = is_sentence_start
+
         -- Track sentence beginning
         if is_sentence_start then
           local category = classify_beginning(el.text)
@@ -752,7 +760,7 @@ wordcount = {
         local syllables = count_syllables(el.text)
         total_syllables = total_syllables + syllables
 
-        if is_complex(el.text, syllables) then
+        if is_complex(el.text, syllables, word_is_sentence_start) then
           complex_words = complex_words + 1
         end
 
@@ -958,7 +966,8 @@ function Pandoc(el)
       flesch_reading_ease = calculate_flesch_reading_ease(words, sentences, total_syllables),
       flesch_kincaid_grade = calculate_flesch_kincaid(words, sentences, total_syllables),
       gunning_fog = calculate_gunning_fog(words, sentences, complex_words),
-      smog = calculate_smog(complex_words, sentences)
+      smog = calculate_smog(complex_words, sentences),
+      complex_words = complex_words
     }
 
     -- Calculate sentence variability
