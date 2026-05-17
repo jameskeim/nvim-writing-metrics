@@ -624,6 +624,7 @@ local function calculate_variability(sentence_lengths)
   local pattern_count = 0
   local pattern_min = nil
   local pattern_max = nil
+  local pattern_sum = 0
 
   for i = 2, #sentence_lengths do
     local diff = math.abs(sentence_lengths[i] - sentence_lengths[i-1])
@@ -632,6 +633,9 @@ local function calculate_variability(sentence_lengths)
         pattern_start = i - 1
         pattern_min = math.min(sentence_lengths[i-1], sentence_lengths[i])
         pattern_max = math.max(sentence_lengths[i-1], sentence_lengths[i])
+        pattern_sum = sentence_lengths[i-1] + sentence_lengths[i]
+      else
+        pattern_sum = pattern_sum + sentence_lengths[i]
       end
       pattern_count = pattern_count + 1
       pattern_min = math.min(pattern_min, sentence_lengths[i])
@@ -644,11 +648,12 @@ local function calculate_variability(sentence_lengths)
           count = pattern_count + 1,
           min_length = pattern_min,
           max_length = pattern_max,
-          avg_length = (pattern_min + pattern_max) / 2
+          avg_length = pattern_sum / (pattern_count + 1)
         })
       end
       pattern_start = nil
       pattern_count = 0
+      pattern_sum = 0
     end
   end
 
@@ -660,7 +665,7 @@ local function calculate_variability(sentence_lengths)
       count = pattern_count + 1,
       min_length = pattern_min,
       max_length = pattern_max,
-      avg_length = (pattern_min + pattern_max) / 2
+      avg_length = pattern_sum / (pattern_count + 1)
     })
   end
 

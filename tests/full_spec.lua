@@ -226,6 +226,47 @@ Conclusions remain controversial.
     end)
   end)
 
+  describe("variability - monotonous pattern average", function()
+    it("reports the actual mean, not (min+max)/2", function()
+      helpers.skip_without_pandoc()
+
+      -- 12 sentences where consecutive diffs are all ≤ 3:
+      --   lengths: 6, 9, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12
+      --   diffs:   3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0  → all ≤ 3, forms one 12-sentence pattern
+      --   min=6, max=12 → midpoint (buggy avg) = 9.0
+      --   true mean = (6+9+12*10)/12 = 135/12 = 11.25
+      local function s(n)
+        local words = {}
+        for i = 1, n do words[i] = "word" end
+        return table.concat(words, " ") .. "."
+      end
+      local sentences = {}
+      sentences[1] = s(6)
+      sentences[2] = s(9)
+      for i = 3, 12 do sentences[i] = s(12) end
+      local content = table.concat(sentences, " ")
+      local bufnr = helpers.create_test_buffer(content)
+      local done, result = false, nil
+
+      require("writing-metrics.full").get_full_metrics(bufnr, function(success, data)
+        assert.is_true(success)
+        result = data
+        done = true
+      end)
+
+      helpers.wait_for_async(function() return done end, 5000)
+
+      local patterns = result.variability and result.variability.patterns or {}
+      assert.is_true(#patterns >= 1, "expected at least one monotonous pattern detected")
+      local avg = patterns[1].avg_length
+      -- True mean is 11.25. Buggy (min+max)/2 = 9.0. Tolerate ±1.5.
+      assert.is_true(
+        math.abs(avg - 11.25) < 1.5,
+        "expected avg ~11.25, got " .. tostring(avg) .. " (likely the (min+max)/2 = 9.0 bug)"
+      )
+    end)
+  end)
+
   describe("edge cases", function()
     it("handles invalid buffer", function()
       local success = pcall(full.show_report, -1)
