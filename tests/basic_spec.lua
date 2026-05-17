@@ -308,6 +308,47 @@ describe("writing-metrics.basic", function()
     end)
   end)
 
+  describe("get_reading_time", function()
+    it("computes minutes from cached word count using configured WPM", function()
+      -- Buffer with arbitrary content; cache is populated directly with known count.
+      local bufnr = helpers.create_test_buffer("placeholder")
+      cache.set_basic(bufnr, { words = 400, chars = 1500, sentences = 20, paragraphs = 4 })
+
+      -- 400 / 200 = 2.0 → ceil = 2 silent minutes
+      -- 400 / 150 = 2.667 → ceil = 3 spoken minutes
+      local result = basic.get_reading_time(bufnr)
+
+      assert.is_not_nil(result)
+      assert.equals(2, result.silent_minutes)
+      assert.equals(3, result.spoken_minutes)
+      assert.equals("~2 min", result.silent)
+      assert.equals("~3 min", result.spoken)
+    end)
+
+    it("returns nil when reading_time.enabled is false", function()
+      local config = require("writing-metrics.config")
+      local saved = vim.deepcopy(config.config.reading_time or {})
+      config.config.reading_time = vim.tbl_extend("force", saved, { enabled = false })
+
+      local bufnr = helpers.create_test_buffer("placeholder")
+      cache.set_basic(bufnr, { words = 400, chars = 1500, sentences = 20, paragraphs = 4 })
+
+      local result = basic.get_reading_time(bufnr)
+      assert.is_nil(result)
+
+      -- Restore config so subsequent tests aren't affected
+      config.config.reading_time = saved
+    end)
+
+    it("returns nil when buffer has no cached word count", function()
+      local bufnr = helpers.create_test_buffer("placeholder")
+      cache.clear_all()
+
+      local result = basic.get_reading_time(bufnr)
+      assert.is_nil(result)
+    end)
+  end)
+
   describe("edge cases", function()
     it("handles invalid buffer", function()
       local result = basic.get_fast_count(-1)

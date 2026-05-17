@@ -102,6 +102,44 @@ function M.get_fast_count(bufnr)
   }
 end
 
+--- Compute reading time for a buffer.
+--- Reads cached word count; returns nil if reading_time is disabled or no
+--- cached count exists. Returned strings are pre-formatted ("~5 min").
+--- Stale cached counts are used without warning; callers should add a
+--- staleness indicator if needed (see get_statusline_string).
+--- @param bufnr integer Buffer to compute for (0 or nil = current buffer)
+--- @return table|nil { silent_minutes, spoken_minutes, silent, spoken }
+function M.get_reading_time(bufnr)
+  bufnr = (bufnr == nil or bufnr == 0) and vim.api.nvim_get_current_buf() or bufnr
+
+  local config = require("writing-metrics.config").config.reading_time
+  if not config or not config.enabled then
+    return nil
+  end
+
+  local wpm_silent = config.wpm_silent or 200
+  local wpm_spoken = config.wpm_spoken or 150
+  if wpm_silent <= 0 or wpm_spoken <= 0 then
+    return nil
+  end
+
+  local cache = require("writing-metrics.cache")
+  local cached, _is_stale = cache.get_basic(bufnr)
+  if not cached or not cached.words or cached.words <= 0 then
+    return nil
+  end
+
+  local silent_min = math.ceil(cached.words / wpm_silent)
+  local spoken_min = math.ceil(cached.words / wpm_spoken)
+
+  return {
+    silent_minutes = silent_min,
+    spoken_minutes = spoken_min,
+    silent = string.format("~%d min", silent_min),
+    spoken = string.format("~%d min", spoken_min),
+  }
+end
+
 --- Get visual mode selection count
 --- @param callback function|nil Optional callback (for async consistency)
 function M.get_selection_count(callback)
@@ -419,6 +457,7 @@ end
 _G.accurate_wordcount = {
   get_accurate_count = M.get_accurate_count,
   get_fast_count = M.get_fast_count,
+  get_reading_time = M.get_reading_time,
   show_comparison = M.show_comparison,
   toggle_statusline_mode = M.toggle_statusline_mode,
   statusline_mode = M.statusline_mode,
