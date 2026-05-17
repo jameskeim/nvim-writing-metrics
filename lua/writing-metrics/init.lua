@@ -3,9 +3,13 @@
 --- @module writing-metrics
 local M = {}
 
---- Global tracking table for report buffers
+--- Global tracking table for report buffers.
 --- Keys are normalized: absolute resolved path for named buffers,
 --- "unnamed:<bufnr>" for unnamed buffers (see display.tracking_key).
+--- The table is reset to {} inside setup() so :Lazy reload doesn't
+--- preserve stale buffer numbers from a previous load. This line
+--- ensures the table exists for code paths that touch it before
+--- setup() runs.
 --- @type table<string, number>
 _G.writing_metrics_reports = _G.writing_metrics_reports or {}
 
@@ -36,6 +40,12 @@ function M.setup(opts)
   if not ok then
     return false
   end
+
+  -- Reset report tracking unconditionally so :Lazy reload (which re-requires
+  -- this module but preserves _G across the reload) starts each setup with
+  -- a fresh table. Without this, stale buffer numbers from the prior load
+  -- can collide with newly-allocated bufnrs or point to wiped buffers.
+  _G.writing_metrics_reports = {}
 
   -- One-time side effects (autocmds, validators, command registration).
   if M._initialized then
