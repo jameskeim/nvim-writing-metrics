@@ -303,7 +303,8 @@ Conclusions remain controversial.
       f:write("# Test\n\nA paragraph with words.\n")
       f:close()
 
-      local filter = vim.fn.fnamemodify("scripts/textmetrics.lua", ":p")
+      local filter = require("writing-metrics.config").get_filter_path()
+      assert.is_string(filter, "filter path should resolve via config.get_filter_path()")
 
       local result = vim.system({
         "pandoc", temp_md,
@@ -318,6 +319,9 @@ Conclusions remain controversial.
       local stderr = result.stderr or ""
       assert.is_nil(stderr:find("table.concat", 1, true),
         "stderr should not contain table.concat error; got: " .. stderr)
+      local stdout = result.stdout or ""
+      assert.truthy(stdout:match("^%s*%d+%s+%d+%s+%d+%s+%d+%s+%S+%s+%S+%s*$"),
+        "stdout should be six-field metrics line; got: " .. stdout)
     end)
   end)
 end)
