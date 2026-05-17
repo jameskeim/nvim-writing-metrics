@@ -892,6 +892,15 @@ blockcounter = {
     return el  -- Continue walking child elements
   end,
 
+  Plain = function(el)
+    -- Plain blocks appear inside compact list items (no blank line between).
+    -- Treat them like single-paragraph units so compact lists count items
+    -- without relying on the list handler to do paragraph counting.
+    paragraphs = paragraphs + 1
+    lines = lines + 1
+    return el
+  end,
+
   Header = function(el)
     -- Headings count as structural paragraph units (both modes)
     paragraphs = paragraphs + 1
@@ -905,20 +914,15 @@ blockcounter = {
   end,
 
   BulletList = function(el)
-    -- Each list item is like a mini-paragraph (both modes)
-    for i,item in ipairs(el.content) do
-      paragraphs = paragraphs + 1
-      lines = lines + 1
-    end
+    -- Do not count items here. Items contain either Para (loose lists) or
+    -- Plain (compact lists), both of which have their own handlers above
+    -- that increment paragraphs/lines exactly once per item. Counting here
+    -- as well would double-count loose lists.
     return el
   end,
 
   OrderedList = function(el)
-    -- Same as bullet list (both modes)
-    for i,item in ipairs(el.content) do
-      paragraphs = paragraphs + 1
-      lines = lines + 1
-    end
+    -- Same as BulletList: rely on inner Para/Plain handlers.
     return el
   end,
 

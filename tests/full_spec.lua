@@ -379,4 +379,59 @@ Conclusions remain controversial.
       end)
     end)
   end)
+
+  describe("list paragraph counting", function()
+    it("counts loose list items once, not twice", function()
+      helpers.skip_without_pandoc()
+
+      -- Loose list: blank lines between items → Pandoc emits Para inside.
+      -- Pre-fix bug: each item counts via BulletList AND via Para → 2× inflation.
+      local content = table.concat({
+        "- first item",
+        "",
+        "- second item",
+        "",
+        "- third item",
+      }, "\n")
+      local bufnr = helpers.create_test_buffer(content)
+
+      local result_data = nil
+      require("writing-metrics.full").get_full_metrics(bufnr, function(success, data)
+        if success then result_data = data end
+      end)
+
+      helpers.wait_for_async(function() return result_data ~= nil end, 5000)
+
+      assert.is_not_nil(result_data)
+      assert.equals(3, result_data.basic.paragraphs,
+        "3 loose list items should yield 3 paragraphs; got: "
+        .. tostring(result_data.basic.paragraphs))
+    end)
+
+    it("counts compact list items once (regression guard)", function()
+      helpers.skip_without_pandoc()
+
+      -- Compact list: no blank lines between items → Pandoc emits Plain.
+      -- Pre-fix: counted via BulletList only. Post-fix: counted via Plain only.
+      -- Either way the count should be 3.
+      local content = table.concat({
+        "- first item",
+        "- second item",
+        "- third item",
+      }, "\n")
+      local bufnr = helpers.create_test_buffer(content)
+
+      local result_data = nil
+      require("writing-metrics.full").get_full_metrics(bufnr, function(success, data)
+        if success then result_data = data end
+      end)
+
+      helpers.wait_for_async(function() return result_data ~= nil end, 5000)
+
+      assert.is_not_nil(result_data)
+      assert.equals(3, result_data.basic.paragraphs,
+        "3 compact list items should yield 3 paragraphs; got: "
+        .. tostring(result_data.basic.paragraphs))
+    end)
+  end)
 end)
