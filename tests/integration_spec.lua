@@ -320,4 +320,27 @@ describe("writing-metrics integration", function()
       assert.is_true(success, "Should handle large documents")
     end)
   end)
+
+  describe("parse_basic_output - input validation", function()
+    local utils = require("writing-metrics.utils")
+
+    it("returns nil + error for non-numeric tokens", function()
+      -- A line with 6 tokens but one is non-numeric.
+      local result, err = utils.parse_basic_output("1247 7892 65 42 NaN 6.33")
+      assert.is_nil(result)
+      assert.is_string(err)
+      assert.is_true(
+        err:lower():find("numeric") ~= nil or err:lower():find("invalid") ~= nil,
+        "error should mention non-numeric: " .. tostring(err)
+      )
+    end)
+
+    it("parses a valid 6-value line", function()
+      local result, err = utils.parse_basic_output("1247 7892 65 42 19.18 6.33")
+      assert.is_nil(err)
+      assert.is_not_nil(result)
+      assert.equals(1247, result.words)
+      assert.equals(6.33, result.avg_word_len)
+    end)
+  end)
 end)

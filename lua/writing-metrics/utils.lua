@@ -171,7 +171,13 @@ function M.parse_basic_output(output)
 
   local values = {}
   for value in metrics_line:gmatch("%S+") do
-    table.insert(values, tonumber(value))
+    local n = tonumber(value)
+    -- tonumber("NaN") returns a real NaN float in LuaJIT (truthy).
+    -- NaN is the only value that does not equal itself, hence `n ~= n`.
+    if not n or n ~= n then
+      return nil, "Non-numeric value in metrics output: " .. value
+    end
+    table.insert(values, n)
   end
 
   if #values < 6 then
