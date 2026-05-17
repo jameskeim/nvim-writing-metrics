@@ -674,6 +674,55 @@ local function calculate_variability(sentence_lengths)
 end
 
 -- ═══════════════════════════════════════════════════════════════
+-- ABBREVIATION / DECIMAL HELPERS
+-- ═══════════════════════════════════════════════════════════════
+
+-- Common English abbreviations that contain '.' but do not end sentences.
+-- Compared case-insensitively against the token text with trailing punctuation stripped.
+local ABBREVIATIONS = {
+  ["dr"] = true, ["mr"] = true, ["mrs"] = true, ["ms"] = true, ["jr"] = true, ["sr"] = true,
+  ["e.g"] = true, ["i.e"] = true, ["etc"] = true, ["vs"] = true, ["cf"] = true,
+  ["st"] = true, ["mt"] = true, ["fig"] = true, ["no"] = true, ["vol"] = true,
+  ["ed"] = true, ["eds"] = true, ["op"] = true, ["pp"] = true, ["ch"] = true,
+  ["u.s"] = true, ["u.s.a"] = true, ["u.k"] = true, ["a.m"] = true, ["p.m"] = true,
+  ["ph.d"] = true, ["m.d"] = true, ["b.a"] = true, ["m.a"] = true,
+}
+
+-- Returns true if the token text (with optional surrounding punctuation) appears to be
+-- a known abbreviation, not a true sentence terminator.
+local function is_abbreviation(text)
+  -- Strip trailing punctuation/whitespace; lowercase for case-insensitive match.
+  local cleaned = text:gsub("[%s%.,;:!%?]+$", ""):lower()
+  return ABBREVIATIONS[cleaned] == true
+end
+
+-- Returns true if the token is a decimal-bearing number like "3.14" or "$3.14"
+-- where the trailing '.' is the decimal point itself, not a sentence boundary.
+-- Tokens like "$4.20." end with a real sentence-period after the decimal, so they
+-- should NOT be suppressed — return false in that case.
+local function is_decimal_number(text)
+  -- Must contain a decimal pattern (digit.digit)
+  if not text:match("%d+%.%d+") then
+    return false
+  end
+  -- If the token ends with digit(s), the trailing '.' in the match IS the decimal.
+  -- e.g. "3.14" or "$3.14" → true (no extra trailing period).
+  -- If the token ends in '.' after digits, that could be a sentence terminator.
+  -- e.g. "$4.20." → the final '.' is a sentence-end period, not the decimal dot.
+  -- Distinguish: after stripping the last '.', check if the result still has digit.digit.
+  local stripped = text:gsub("%.$", "")  -- remove one trailing period if present
+  if stripped == text then
+    -- No trailing period was present; the match is purely a decimal number.
+    return true
+  else
+    -- There WAS a trailing period. If the stripped form still ends in digits
+    -- that are part of a decimal (e.g. "4.20" in "$4.20"), this '.' is a
+    -- sentence terminator following a decimal number — do NOT suppress.
+    return false
+  end
+end
+
+-- ═══════════════════════════════════════════════════════════════
 -- ELEMENT HANDLERS (INLINE)
 -- ═══════════════════════════════════════════════════════════════
 
@@ -750,8 +799,12 @@ wordcount = {
     -- Count all characters in text nodes (both modes)
     chars = chars + #el.text
 
-    -- Count sentences: look for sentence-ending punctuation at end of string (both modes)
-    if el.text:match("[.!?]%s*$") then
+    -- Count sentences: look for sentence-ending punctuation at end of string (both modes).
+    -- Guard against abbreviations (Dr., Mr., e.g.) and decimal numbers (3.14, $4.20)
+    -- which would otherwise falsely increment the sentence counter.
+    if el.text:match("[.!?]%s*$")
+       and not is_abbreviation(el.text)
+       and not is_decimal_number(el.text) then
       sentences = sentences + 1
 
       -- Detect questions (sentences ending with ?)

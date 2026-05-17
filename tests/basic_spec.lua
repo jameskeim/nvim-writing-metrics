@@ -248,6 +248,43 @@ describe("writing-metrics.basic", function()
     end)
   end)
 
+  describe("accurate word count - abbreviation handling", function()
+    it("does not split sentences on common abbreviations", function()
+      helpers.skip_without_pandoc()
+
+      local content = "Dr. Smith arrived early. Mr. Jones was late. We use e.g., Python."
+      local bufnr = helpers.create_test_buffer(content)
+      local done, result_sentences = false, nil
+
+      basic.get_accurate_count(bufnr, function(data)
+        result_sentences = data and data.sentences
+        done = true
+      end)
+
+      helpers.wait_for_async(function() return done end, 5000)
+      assert.is_true(done, "Callback should be called within timeout")
+      -- 3 sentences total; without the fix, abbreviations push this to 5+.
+      assert.equals(3, result_sentences, "expected 3 sentences, got " .. tostring(result_sentences))
+    end)
+
+    it("does not split sentences on decimals", function()
+      helpers.skip_without_pandoc()
+
+      local content = "The price is $3.14 today. Tomorrow it rises to $4.20."
+      local bufnr = helpers.create_test_buffer(content)
+      local done, result_sentences = false, nil
+
+      basic.get_accurate_count(bufnr, function(data)
+        result_sentences = data and data.sentences
+        done = true
+      end)
+
+      helpers.wait_for_async(function() return done end, 5000)
+      assert.is_true(done, "Callback should be called within timeout")
+      assert.equals(2, result_sentences, "expected 2 sentences, got " .. tostring(result_sentences))
+    end)
+  end)
+
   describe("accurate word count - code block exclusion", function()
     it("excludes fenced code block content from word counts", function()
       helpers.skip_without_pandoc()
