@@ -43,6 +43,10 @@ local function setup_commands()
     range = true,
   })
 
+  vim.api.nvim_create_user_command("ReadingTime", function()
+    require("writing-metrics.basic").show_reading_time()
+  end, { desc = "Show reading time toast (silent + spoken)" })
+
   vim.api.nvim_create_user_command("WritingMetrics", function()
     local config = require("writing-metrics.config")
     local utils = require("writing-metrics.utils")

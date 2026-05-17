@@ -140,6 +140,50 @@ function M.get_reading_time(bufnr)
   }
 end
 
+--- Show a vim.notify toast with both reading-time profiles.
+--- Triggers an accurate word count via the standard pipeline; falls
+--- back to vim.fn.wordcount() if the accurate path fails.
+function M.show_reading_time()
+  local config = require("writing-metrics.config").config.reading_time
+  if not config or not config.enabled then
+    vim.notify("Reading time is disabled in config (reading_time.enabled = false)", vim.log.levels.WARN)
+    return
+  end
+
+  local utils = require("writing-metrics.utils")
+  local bufnr = vim.api.nvim_get_current_buf()
+
+  local function format_toast(words, prefix)
+    local silent_min = math.ceil(words / config.wpm_silent)
+    local spoken_min = math.ceil(words / config.wpm_spoken)
+    return string.format(
+      "%s~%d min silent · ~%d min spoken  (%s words at %d/%d wpm)",
+      prefix or "",
+      silent_min,
+      spoken_min,
+      utils.format_number(words),
+      config.wpm_silent,
+      config.wpm_spoken
+    )
+  end
+
+  M.get_accurate_count(bufnr, function(result, _method)
+    if result and result.words and result.words > 0 then
+      vim.notify(format_toast(result.words), vim.log.levels.INFO)
+      return
+    end
+
+    -- Fallback: raw fast count, marked clearly
+    local wc = vim.fn.wordcount()
+    local words = wc.words or 0
+    if words > 0 then
+      vim.notify(format_toast(words, "(fast) "), vim.log.levels.WARN)
+    else
+      vim.notify("No words to count in current buffer", vim.log.levels.WARN)
+    end
+  end)
+end
+
 --- Get visual mode selection count
 --- @param callback function|nil Optional callback (for async consistency)
 function M.get_selection_count(callback)
@@ -458,6 +502,7 @@ _G.accurate_wordcount = {
   get_accurate_count = M.get_accurate_count,
   get_fast_count = M.get_fast_count,
   get_reading_time = M.get_reading_time,
+  show_reading_time = M.show_reading_time,
   show_comparison = M.show_comparison,
   toggle_statusline_mode = M.toggle_statusline_mode,
   statusline_mode = M.statusline_mode,
