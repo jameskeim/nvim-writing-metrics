@@ -122,6 +122,25 @@ describe("writing-metrics.config", function()
     end)
   end)
 
+  describe("setup idempotency", function()
+    it("merges opts from second setup() call instead of dropping them", function()
+      package.loaded["writing-metrics"] = nil
+      package.loaded["writing-metrics.config"] = nil
+      local init = require("writing-metrics")
+      local config = require("writing-metrics.config")
+
+      -- First call: auto-init style, no opts.
+      init.setup({})
+
+      -- Second call: user provides explicit opts.
+      init.setup({ features = { readability = false } })
+
+      -- Verify user opts were applied.
+      assert.equals(false, config.config.features.readability,
+        "second setup() call did not apply user opts")
+    end)
+  end)
+
   describe("filter path detection", function()
     it("returns a string path", function()
       local filter_path = config.get_filter_path()

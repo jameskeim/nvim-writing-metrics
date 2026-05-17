@@ -28,15 +28,17 @@ end
 --- @param opts table|nil User configuration
 --- @return boolean Success
 function M.setup(opts)
-  if M._initialized then
-    return true
-  end
-
+  -- Always merge opts so subsequent calls with explicit opts are honored.
   local config = get_config()
   local ok = config.setup(opts or {})
 
   if not ok then
     return false
+  end
+
+  -- One-time side effects (autocmds, validators, command registration).
+  if M._initialized then
+    return true
   end
 
   -- Setup cache invalidation autocmds
@@ -509,15 +511,6 @@ _G.text_metrics = function()
   end
 
   return "󰗊 …"
-end
-
--- Auto-initialize on first require if not explicitly setup
-if not M._initialized then
-  vim.schedule(function()
-    if not M._initialized then
-      M.setup()
-    end
-  end)
 end
 
 -- Manual testing:
