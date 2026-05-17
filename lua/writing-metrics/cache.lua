@@ -18,7 +18,7 @@ local cache = {
 --- Get current timestamp in milliseconds
 --- @return number
 local function now()
-  return vim.loop.now()
+  return vim.uv.now()
 end
 
 --- Get basic metrics from cache
@@ -139,7 +139,7 @@ function M.setup_autocmds()
   vim.api.nvim_create_autocmd({ "TextChanged", "TextChangedI", "InsertLeave" }, {
     group = group,
     callback = function(args)
-      local ft = vim.api.nvim_buf_get_option(args.buf, "filetype")
+      local ft = vim.api.nvim_get_option_value("filetype", { buf = args.buf })
       local utils = require("writing-metrics.utils")
 
       -- Only process writing filetypes
@@ -158,7 +158,7 @@ function M.setup_autocmds()
   vim.api.nvim_create_autocmd("BufWritePost", {
     group = group,
     callback = function(args)
-      local ft = vim.api.nvim_buf_get_option(args.buf, "filetype")
+      local ft = vim.api.nvim_get_option_value("filetype", { buf = args.buf })
       local utils = require("writing-metrics.utils")
 
       -- Only process writing filetypes
@@ -177,7 +177,7 @@ function M.setup_autocmds()
   })
 
   -- Optional: Periodic cleanup of stale entries (every 5 minutes)
-  local timer = vim.loop.new_timer()
+  local timer = vim.uv.new_timer()
   timer:start(
     300000,
     300000,
