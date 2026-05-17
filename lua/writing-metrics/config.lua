@@ -60,6 +60,15 @@ M.defaults = {
     },
   },
 
+  -- Reading time estimation
+  reading_time = {
+    enabled = true,                 -- compute reading time at all
+    wpm_silent = 200,               -- average silent reading speed
+    wpm_spoken = 150,               -- presentation / spoken delivery rate
+    statusline = true,              -- show in statusline
+    statusline_profile = "silent",  -- "silent" | "spoken" | "both"
+  },
+
   -- Pandoc filter settings
   filter = {
     auto_detect = true, -- Automatically find bundled filter
