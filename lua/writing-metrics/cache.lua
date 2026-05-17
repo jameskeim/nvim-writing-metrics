@@ -85,6 +85,14 @@ function M.invalidate(bufnr)
   end
 end
 
+--- Permanently remove all cached entries for a buffer.
+--- Called on BufDelete/BufWipeout to prevent unbounded cache growth.
+--- Unlike invalidate (which marks stale for content changes), this is for buffer lifetime.
+--- @param bufnr number Buffer number
+function M.remove(bufnr)
+  cache.basic[bufnr] = nil
+end
+
 --- Clear all caches (useful for testing or low memory situations)
 function M.clear_all()
   cache.basic = {}
@@ -180,10 +188,10 @@ function M.setup_autocmds()
   })
 
   -- Clean up cache when buffer is deleted to prevent memory leaks
-  vim.api.nvim_create_autocmd("BufDelete", {
+  vim.api.nvim_create_autocmd({ "BufDelete", "BufWipeout" }, {
     group = group,
     callback = function(args)
-      M.invalidate(args.buf)
+      M.remove(args.buf)
     end,
   })
 

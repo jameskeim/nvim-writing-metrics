@@ -209,6 +209,27 @@ describe("writing-metrics.cache", function()
     end)
   end)
 
+  describe("buffer lifecycle", function()
+    it("removes cache entries when buffer is deleted, not just marks stale", function()
+      cache.setup_autocmds()  -- idempotently wires the autocmds
+
+      local bufnr = helpers.create_test_buffer("Some text.")
+      cache.set_basic(bufnr, { words = 2, chars = 10, sentences = 1, paragraphs = 1 })
+
+      -- Sanity: cache has the entry.
+      local before = cache.get_basic(bufnr)
+      assert.is_not_nil(before)
+
+      -- Delete the buffer; autocmd should fire and remove the cache entry.
+      vim.api.nvim_buf_delete(bufnr, { force = true })
+
+      -- After deletion, the entry must be gone (not just marked stale).
+      local stats = cache.get_stats()
+      assert.equals(0, stats.basic_entries,
+        "expected 0 basic_entries after BufDelete, got " .. tostring(stats.basic_entries))
+    end)
+  end)
+
   describe("edge cases", function()
     it("handles invalid buffer numbers", function()
       local result = cache.get_basic(-1)
