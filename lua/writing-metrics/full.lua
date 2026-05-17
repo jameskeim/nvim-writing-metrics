@@ -86,7 +86,7 @@ function M.show_report(bufnr)
   end
 
   -- Validation 2: Only generate reports for writing filetypes
-  local ft = vim.api.nvim_buf_get_option(bufnr, "filetype")
+  local ft = vim.api.nvim_get_option_value("filetype", { buf = bufnr })
   if not utils.is_writing_filetype(ft) then
     utils.notify(
       "Not a writing buffer (filetype: " .. ft .. ")",
