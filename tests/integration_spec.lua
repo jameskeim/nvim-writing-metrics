@@ -246,6 +246,45 @@ describe("writing-metrics integration", function()
     end)
   end)
 
+  describe("get_metrics - cache stale handling", function()
+    it("recomputes after content change instead of returning stale data", function()
+      helpers.skip_without_pandoc()
+
+      local init = require("writing-metrics")
+      local cache_mod = require("writing-metrics.cache")
+
+      local bufnr = helpers.create_test_buffer("Two words.")
+      local first_result, second_result
+      local done1, done2 = false, false
+
+      -- First call: populates cache.
+      init.get_metrics(bufnr, "basic", function(success, data)
+        first_result = data
+        done1 = true
+      end)
+      helpers.wait_for_async(function() return done1 end, 5000)
+      assert.equals(2, first_result.words)
+
+      -- Mark cache stale (simulates TextChanged).
+      cache_mod.invalidate(bufnr)
+
+      -- Replace buffer content with longer text.
+      vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { "Four words here now actually five words." })
+
+      -- Second call: must NOT return cached "Two words" data.
+      init.get_metrics(bufnr, "basic", function(success, data)
+        second_result = data
+        done2 = true
+      end)
+      helpers.wait_for_async(function() return done2 end, 5000)
+
+      assert.is_true(
+        second_result.words > 2,
+        "got " .. tostring(second_result.words) .. " words; cache returned stale data"
+      )
+    end)
+  end)
+
   describe("performance", function()
     it("fast count is instant", function()
       local bufnr = helpers.create_test_buffer(helpers.test_documents.complex)

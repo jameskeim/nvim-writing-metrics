@@ -109,8 +109,8 @@ function M.get_metrics(bufnr, mode, callback)
 
   -- Only check cache for basic mode (statusline)
   if mode == "basic" then
-    local cached = cache.get_basic(bufnr)
-    if cached then
+    local cached, is_stale = cache.get_basic(bufnr)
+    if cached and not is_stale then
       callback(true, cached)
       return
     end
