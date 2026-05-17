@@ -109,7 +109,7 @@ function M.show_report(bufnr)
 
     -- Format the report
     local display = require("writing-metrics.display")
-    local lines = display.format_report(result)
+    local lines = display.format_report(result, bufnr)
 
     -- Check if report already exists for this buffer
     local existing_report = display.find_existing_report(bufnr)

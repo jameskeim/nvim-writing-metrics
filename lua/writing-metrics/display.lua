@@ -64,15 +64,26 @@ end
 
 --- Format the complete comprehensive report
 --- @param data table Full metrics data from Pandoc filter
+--- @param source_bufnr number|nil Buffer number of the source document (captured before async)
 --- @return table Lines for display
-function M.format_report(data)
+function M.format_report(data, source_bufnr)
   local lines = {}
+
+  -- Resolve source buffer name at format time using the captured bufnr,
+  -- not the current buffer (which may have changed during the async Pandoc call).
+  local source_name
+  if source_bufnr and vim.api.nvim_buf_is_valid(source_bufnr) then
+    source_name = vim.api.nvim_buf_get_name(source_bufnr)
+    if source_name == "" then source_name = "(unnamed buffer)" end
+  else
+    source_name = "(unknown buffer)"
+  end
 
   -- Header
   table.insert(lines, "# Writing Metrics Report")
   table.insert(lines, "")
   table.insert(lines, string.format("**Generated:** %s", os.date("%Y-%m-%d %H:%M:%S")))
-  table.insert(lines, "**Buffer:** " .. vim.api.nvim_buf_get_name(0))
+  table.insert(lines, "**Buffer:** " .. source_name)
   table.insert(lines, "")
   table.insert(lines, "---")
 
