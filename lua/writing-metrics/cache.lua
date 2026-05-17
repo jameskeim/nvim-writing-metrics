@@ -11,7 +11,7 @@ local cache = {
 
 --- Cache entry structure
 --- @class CacheEntry
---- @field content_hash string Hash of buffer content
+--- @field changedtick number Buffer changedtick at cache time
 --- @field timestamp number Unix timestamp
 --- @field data table Metrics data
 
@@ -32,14 +32,6 @@ function M.is_valid(entry, ttl)
 
   local age = now() - entry.timestamp
   return age < ttl
-end
-
---- Get the current content hash for a buffer
---- @param bufnr number Buffer number
---- @return string Content hash
-local function get_current_hash(bufnr)
-  local utils = require("writing-metrics.utils")
-  return utils.get_content_hash(bufnr)
 end
 
 --- Get basic metrics from cache
@@ -66,10 +58,10 @@ end
 --- @param bufnr number Buffer number
 --- @param data table Basic metrics data
 function M.set_basic(bufnr, data)
-  local current_hash = get_current_hash(bufnr)
-
+  -- Guard: buffer may have been deleted by the time an async callback fires
+  local tick = vim.api.nvim_buf_is_valid(bufnr) and vim.b[bufnr].changedtick or -1
   cache.basic[bufnr] = {
-    content_hash = current_hash,
+    changedtick = tick,
     timestamp = now(),
     data = data,
     stale = false,  -- Fresh data
@@ -82,6 +74,7 @@ end
 function M.invalidate(bufnr)
   if cache.basic[bufnr] then
     cache.basic[bufnr].stale = true  -- Mark stale, don't delete
+    cache.basic[bufnr].changedtick = -1  -- Force mismatch on next content_changed check
   end
 end
 
@@ -122,7 +115,7 @@ function M.get_statistics()
   -- Count entries and estimate memory
   for _, entry in pairs(cache.basic) do
     basic_count = basic_count + 1
-    -- Rough memory estimate: hash (32 bytes) + timestamp (8 bytes) + data (estimate 200 bytes)
+    -- Rough memory estimate: changedtick (8 bytes) + timestamp (8 bytes) + data (estimate 200 bytes)
     basic_memory = basic_memory + 240
   end
 
@@ -136,18 +129,21 @@ function M.get_statistics()
 end
 
 --- Check if content has changed since last cache
+--- Uses vim.b[bufnr].changedtick — a free, monotonically-increasing per-buffer
+--- integer maintained by Neovim. Avoids expensive get_content_hash calls on
+--- every TextChangedI (which fires on every keystroke in insert mode).
 --- @param bufnr number Buffer number
 --- @return boolean True if content changed
 function M.content_changed(bufnr)
-  local current_hash = get_current_hash(bufnr)
-
-  -- Check basic cache
-  local basic_entry = cache.basic[bufnr]
-  if basic_entry and basic_entry.content_hash == current_hash then
-    return false
+  if not vim.api.nvim_buf_is_valid(bufnr) then
+    return true
   end
-
-  return true
+  local tick = vim.b[bufnr].changedtick
+  local entry = cache.basic[bufnr]
+  if not entry or entry.changedtick ~= tick then
+    return true
+  end
+  return false
 end
 
 --- Setup cache invalidation autocmds
@@ -230,7 +226,7 @@ function M.inspect(bufnr)
   if bufnr then
     return {
       basic = cache.basic[bufnr],
-      current_hash = get_current_hash(bufnr),
+      current_changedtick = vim.b[bufnr].changedtick,
     }
   else
     return {
