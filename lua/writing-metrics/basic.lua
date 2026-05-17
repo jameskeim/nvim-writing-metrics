@@ -153,17 +153,20 @@ function M.show_reading_time()
   local utils = require("writing-metrics.utils")
   local bufnr = vim.api.nvim_get_current_buf()
 
+  local wpm_silent = config.wpm_silent or 200
+  local wpm_spoken = config.wpm_spoken or 150
+
   local function format_toast(words, prefix)
-    local silent_min = math.ceil(words / config.wpm_silent)
-    local spoken_min = math.ceil(words / config.wpm_spoken)
+    local silent_min = math.ceil(words / wpm_silent)
+    local spoken_min = math.ceil(words / wpm_spoken)
     return string.format(
       "%s~%d min silent · ~%d min spoken  (%s words at %d/%d wpm)",
       prefix or "",
       silent_min,
       spoken_min,
       utils.format_number(words),
-      config.wpm_silent,
-      config.wpm_spoken
+      wpm_silent,
+      wpm_spoken
     )
   end
 
