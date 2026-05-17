@@ -2,6 +2,29 @@
 --- @module writing-metrics.utils
 local M = {}
 
+--- Extract the JSON object line from filter output.
+--- The textmetrics filter emits JSON via print(json.encode(...)), which is
+--- always a single line. Pandoc warnings may appear before the JSON and
+--- may legitimately contain '{', so a greedy first-'{' search is unsafe.
+--- Strategy: scan from the end and return the last line that both starts
+--- with '{' (possibly preceded by whitespace) and ends with '}'.
+--- @param str string Raw filter/pandoc output
+--- @return string|nil The JSON line, or nil if not found
+local function extract_json(str)
+  if not str or str == "" then return nil end
+  local lines = vim.split(str, "\n", { plain = true })
+  for i = #lines, 1, -1 do
+    local line = lines[i]:gsub("^%s+", ""):gsub("%s+$", "")
+    if line:sub(1, 1) == "{" and line:sub(-1) == "}" then
+      return line
+    end
+  end
+  return nil
+end
+
+-- Exposed for use by other modules (e.g. full.lua).
+M._extract_json = extract_json
+
 --- Get the content of a buffer as a single string
 --- @param bufnr number|nil Buffer number (0 or nil for current)
 --- @return string Buffer content
@@ -206,15 +229,11 @@ function M.parse_full_output(output)
     return nil, "Empty output from Pandoc"
   end
 
-  -- Extract JSON (ignore Pandoc warnings)
-  local json_start = output:find("{")
-  if not json_start then
+  local json_str = extract_json(output)
+  if not json_str then
     return nil, "No JSON found in output"
   end
 
-  local json_str = output:sub(json_start)
-
-  -- Parse JSON
   local ok, result = pcall(vim.json.decode, json_str)
   if not ok then
     return nil, "Failed to parse JSON: " .. tostring(result)

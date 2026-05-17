@@ -51,15 +51,12 @@ function M.parse_full_metrics(json_output)
     return nil, "Empty output from Pandoc"
   end
 
-  -- Extract JSON (ignore any Pandoc warnings)
-  local json_start = json_output:find("{")
-  if not json_start then
+  local utils = require("writing-metrics.utils")
+  local json_str = utils._extract_json(json_output)
+  if not json_str then
     return nil, "No JSON found in output"
   end
 
-  local json_str = json_output:sub(json_start)
-
-  -- Parse JSON
   local ok, result = pcall(vim.json.decode, json_str)
   if not ok then
     return nil, "Failed to parse JSON: " .. tostring(result)
