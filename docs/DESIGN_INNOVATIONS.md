@@ -219,3 +219,67 @@ end
 - Zero migration effort for existing users
 - New users can use modern API
 - Deprecation path for future versions
+
+## 6. Progressive Enhancement
+
+**Problem:** Plugin should work even when some analyses are too expensive for the user's hardware or document size.
+
+**Solution:** Per-feature toggles in the defaults table, all on by default; users disable what they don't want.
+
+```lua
+M.defaults = {
+  features = {
+    basic = true,              -- Always available
+    readability = true,        -- Requires syllable counting
+    passive_voice = true,      -- Requires pattern matching
+    nominalizations = true,    -- Requires word analysis
+    vocabulary = true,         -- Requires unique word tracking
+    sentence_variety = true,   -- Requires length tracking
+    ai_words = true,           -- Requires dictionary lookup
+  },
+}
+
+-- User can disable features if they cause issues
+require("writing-metrics").setup({
+  features = {
+    readability = false,  -- Disable if syllable counting is slow
+  }
+})
+```
+
+The full report formatter checks each flag before emitting its section, so disabled features cost nothing at render time.
+
+## 7. Comprehensive Error Context
+
+**Problem:** Generic error messages ("an error occurred") force users to dig through source to figure out what's wrong and how to fix it.
+
+**Solution:** When a precondition fails, return a multi-line message that names the missing thing, says why it matters, and lists platform-specific install steps.
+
+```lua
+-- Bad
+if not ok then
+  return false, "Error"
+end
+
+-- Good
+if vim.fn.executable("pandoc") ~= 1 then
+  return false, [[
+Pandoc not found in PATH. Please install Pandoc >= 2.19.
+
+Installation instructions:
+  Ubuntu/Debian:  sudo apt install pandoc
+  Arch Linux:     sudo pacman -S pandoc
+  macOS:          brew install pandoc
+  Windows:        choco install pandoc
+
+After installation, restart Neovim.
+]]
+end
+```
+
+**Error context includes:**
+
+1. What went wrong: "Pandoc not found"
+2. Why it matters: "Required for metrics computation"
+3. How to fix: platform-specific install commands
+4. Next steps: "Restart Neovim"
