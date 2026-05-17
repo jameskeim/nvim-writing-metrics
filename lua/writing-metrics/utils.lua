@@ -88,7 +88,7 @@ function M.is_report_buffer(bufnr)
   end
 
   -- Report buffers have buftype=nofile and name starts with "Report:"
-  local ok_buftype, buftype = pcall(vim.api.nvim_buf_get_option, bufnr, "buftype")
+  local ok_buftype, buftype = pcall(vim.api.nvim_get_option_value, "buftype", { buf = bufnr })
   if not ok_buftype or buftype ~= "nofile" then
     return false
   end
@@ -268,8 +268,8 @@ function M.create_float_window(content, opts)
   -- Create buffer
   local bufnr = vim.api.nvim_create_buf(false, true)
   vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
-  vim.api.nvim_buf_set_option(bufnr, "modifiable", false)
-  vim.api.nvim_buf_set_option(bufnr, "bufhidden", "wipe")
+  vim.api.nvim_set_option_value("modifiable", false, { buf = bufnr })
+  vim.api.nvim_set_option_value("bufhidden", "wipe", { buf = bufnr })
 
   -- Create window
   local win_opts = {
@@ -316,9 +316,9 @@ function M.open_report_tab(content, opts)
   vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
 
   -- Set buffer options
-  vim.api.nvim_buf_set_option(bufnr, "filetype", opts.filetype or "markdown")
-  vim.api.nvim_buf_set_option(bufnr, "buftype", "nofile")
-  vim.api.nvim_buf_set_option(bufnr, "bufhidden", "wipe")
+  vim.api.nvim_set_option_value("filetype", opts.filetype or "markdown", { buf = bufnr })
+  vim.api.nvim_set_option_value("buftype", "nofile", { buf = bufnr })
+  vim.api.nvim_set_option_value("bufhidden", "wipe", { buf = bufnr })
 
   if opts.title then
     vim.api.nvim_buf_set_name(bufnr, opts.title)
