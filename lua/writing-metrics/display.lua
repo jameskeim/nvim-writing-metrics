@@ -179,6 +179,24 @@ function M.format_basic_section(basic)
   table.insert(lines, string.format("| Sentences | **%s** |", utils.format_number(basic.sentences)))
   table.insert(lines, string.format("| Paragraphs | **%s** |", utils.format_number(basic.paragraphs)))
   table.insert(lines, string.format("| Lines | **%s** |", utils.format_number(basic.lines)))
+  -- Append reading time rows if enabled
+  local rt_config = require("writing-metrics.config").config.reading_time
+  if rt_config and rt_config.enabled and basic.words and basic.words > 0 then
+    local wpm_silent = rt_config.wpm_silent or 200
+    local wpm_spoken = rt_config.wpm_spoken or 150
+    if wpm_silent > 0 and wpm_spoken > 0 then
+      local silent_min = math.ceil(basic.words / wpm_silent)
+      local spoken_min = math.ceil(basic.words / wpm_spoken)
+      table.insert(lines, string.format(
+        "| Reading time (silent, %d wpm) | **~%d min** |",
+        wpm_silent, silent_min
+      ))
+      table.insert(lines, string.format(
+        "| Reading time (spoken, %d wpm) | **~%d min** |",
+        wpm_spoken, spoken_min
+      ))
+    end
+  end
   table.insert(lines, "")
   table.insert(lines, "**Averages:**")
   table.insert(lines, "")
