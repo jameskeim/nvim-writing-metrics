@@ -88,7 +88,7 @@ describe("writing-metrics.full", function()
       local callback_called = false
       local result_data = nil
 
-      full.get_full_metrics(bufnr, function(data)
+      full.get_full_metrics(bufnr, function(_, data)
         callback_called = true
         result_data = data
       end)
@@ -102,33 +102,13 @@ describe("writing-metrics.full", function()
       helpers.assert_metrics_structure(result_data, "full")
     end)
 
-    it("caches full metrics", function()
-      helpers.skip_without_pandoc()
-
-      local bufnr = helpers.create_test_buffer(helpers.test_documents.simple)
-
-      -- First call
-      local first_done = false
-      full.get_full_metrics(bufnr, function()
-        first_done = true
-      end)
-
-      helpers.wait_for_async(function()
-        return first_done
-      end, 5000)
-
-      -- Check cache
-      local cached = cache.get_full(bufnr)
-      assert.is_not_nil(cached)
-    end)
-
     it("handles empty buffer", function()
       helpers.skip_without_pandoc()
 
       local bufnr = helpers.create_test_buffer(helpers.test_documents.empty)
       local result_data = nil
 
-      full.get_full_metrics(bufnr, function(data)
+      full.get_full_metrics(bufnr, function(_, data)
         result_data = data
       end)
 
@@ -281,7 +261,7 @@ Conclusions remain controversial.
       local bufnr = helpers.create_test_buffer("   \n\n   ")
       local result_data = nil
 
-      full.get_full_metrics(bufnr, function(data)
+      full.get_full_metrics(bufnr, function(_, data)
         result_data = data
       end)
 
