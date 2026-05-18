@@ -98,7 +98,7 @@ M.defaults = {
   },
   filter = {
     auto_detect = true,
-    custom_path = nil,  -- Override with custom path
+    path = nil,  -- Explicit filter path. nil = use auto-detect.
   },
 }
 ```
@@ -350,7 +350,7 @@ require("writing-metrics").setup({
     statusline_format = "both",  -- Show both words and chars
   },
   filter = {
-    custom_path = "/custom/path/to/textmetrics.lua"  -- Override filter location
+    path = "/custom/path/to/textmetrics.lua"  -- Override filter location
   },
 })
 ```
