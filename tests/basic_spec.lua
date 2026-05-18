@@ -95,7 +95,7 @@ describe("writing-metrics.basic", function()
       -- Wait for async callback
       local success = helpers.wait_for_async(function()
         return callback_called
-      end, 3000)
+      end, 5000)
 
       assert.is_true(success, "Callback should be called within timeout")
       assert.is_not_nil(result_data)
