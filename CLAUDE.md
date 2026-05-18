@@ -24,6 +24,7 @@ The plugin follows a modular architecture with clear separation of concerns:
 - `basic.lua` - Fast word counting with statusline integration, supports fast/accurate modes
 - `full.lua` - Comprehensive report generation (always fresh, no caching)
 - `utils.lua` - Shared utilities (Pandoc execution, file I/O, formatting, notifications)
+- `commands.lua` - User command registration; called from init.lua's setup() (idempotent)
 - `display.lua` - Report formatting and buffer management
 
 **Key architectural patterns:**
@@ -72,15 +73,21 @@ The filter is auto-detected in this order:
 ### Backward Compatibility
 
 The plugin maintains backward compatibility with a previous `accurate-wordcount.lua` script:
-- Global `_G.accurate_wordcount` table with old API
+- Global `_G.accurate_wordcount` callable table — `_G.accurate_wordcount()` returns the cached word count (function shape), `_G.accurate_wordcount.<method>(bufnr)` exposes basic-module methods (table shape). Both contracts preserved from the prior `accurate_wordcount.lua` plugin.
 - Command aliases: `:AccurateWordCount` → `:WordCount`, `:ToggleWordCountMode` → `:WritingMetricsToggle`
 - Legacy lualine integration functions
+
+## Plan History
+
+The plugin has a per-feature design-spec history under `docs/superpowers/specs/` and implementation plans under `docs/superpowers/plans/`. Each spec corresponds to a single Plan (letter-named: A, B, C, ...) and to one commit on `main`.
+
+Use `git log --oneline` to find which commit shipped a given plan, or read the spec files directly for the design rationale.
 
 ## Development Commands
 
 ### Running Tests
 
-The test suite uses plenary.nvim with 106 test cases across 6 test files.
+The test suite uses plenary.nvim with 118 test cases across 9 test files (118 passing, 0 failing after Plan H).
 
 **Run all tests:**
 ```bash
