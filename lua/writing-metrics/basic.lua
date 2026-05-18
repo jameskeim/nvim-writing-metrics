@@ -149,7 +149,7 @@ function M.get_reading_time(bufnr)
   end
 
   local cache = require("writing-metrics.cache")
-  local cached, _is_stale = cache.get_basic(bufnr)
+  local cached = cache.get_basic(bufnr)
   if not cached or not cached.words or cached.words <= 0 then
     return nil
   end
@@ -556,8 +556,6 @@ end
 
 --- Setup autocommands for cache invalidation and updates
 function M.setup_autocmds()
-  local cache = require("writing-metrics.cache")
-
   local group = vim.api.nvim_create_augroup("WritingMetricsBasic", { clear = true })
 
   -- Update accurate count in accurate mode

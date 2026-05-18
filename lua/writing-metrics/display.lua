@@ -331,7 +331,6 @@ end
 --- @return table Lines for this section
 function M.format_sentence_variety_section(variability)
   local lines = {}
-  local utils = require("writing-metrics.utils")
 
   table.insert(lines, "")
   table.insert(lines, M.section_heading("length"))

@@ -99,7 +99,7 @@ function M.get_statistics()
   local basic_memory = 0
 
   -- Count entries and estimate memory
-  for _, entry in pairs(cache.basic) do
+  for _ in pairs(cache.basic) do
     basic_count = basic_count + 1
     -- Rough memory estimate: changedtick (8 bytes) + timestamp (8 bytes) + data (estimate 200 bytes)
     basic_memory = basic_memory + 240
