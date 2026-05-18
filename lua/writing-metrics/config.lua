@@ -68,6 +68,11 @@ M.defaults = {
     auto_detect = true, -- Automatically find bundled filter
     custom_path = nil, -- Override with custom path
   },
+
+  -- Command registration
+  commands = {
+    enable_legacy = true, -- Register :AccurateWordCount and :ToggleWordCountMode aliases
+  },
 }
 
 --- Current active configuration (merged with user opts)

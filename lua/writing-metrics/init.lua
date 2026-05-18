@@ -47,7 +47,12 @@ function M.setup(opts)
   -- can collide with newly-allocated bufnrs or point to wiped buffers.
   _G.writing_metrics_reports = {}
 
-  -- One-time side effects (autocmds, validators, command registration).
+  -- Register user commands on every setup() call so opts (e.g. enable_legacy)
+  -- take effect even when setup() is called multiple times. nvim_create_user_command
+  -- overwrites on redefine, so this is safe to call repeatedly.
+  require("writing-metrics.commands").setup_commands(get_config().config)
+
+  -- One-time side effects (autocmds, validators).
   if M._initialized then
     return true
   end
