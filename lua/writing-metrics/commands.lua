@@ -66,7 +66,7 @@ function M.setup_commands(cfg)
       "",
     }
 
-    if config.config.commands and config.config.commands.enable_legacy then
+    if config.get().commands and config.get().commands.enable_legacy then
       table.insert(lines, "## Backward Compatibility")
       table.insert(lines, "")
       table.insert(lines, "| Old Command | New Command |")
@@ -94,12 +94,12 @@ function M.setup_commands(cfg)
       "- Reports: Always compute fresh (no cache)",
       "",
       "**Enabled features:**",
-      "- Basic metrics: " .. (config.config.features.basic and "✓" or "✗"),
-      "- Readability formulas: " .. (config.config.features.readability and "✓" or "✗"),
-      "- Passive voice detection: " .. (config.config.features.passive_voice and "✓" or "✗"),
-      "- Nominalization detection: " .. (config.config.features.nominalizations and "✓" or "✗"),
-      "- Vocabulary analysis: " .. (config.config.features.vocabulary and "✓" or "✗"),
-      "- Sentence variety: " .. (config.config.features.sentence_variety and "✓" or "✗"),
+      "- Basic metrics: " .. (config.get().features.basic and "✓" or "✗"),
+      "- Readability formulas: " .. (config.get().features.readability and "✓" or "✗"),
+      "- Passive voice detection: " .. (config.get().features.passive_voice and "✓" or "✗"),
+      "- Nominalization detection: " .. (config.get().features.nominalizations and "✓" or "✗"),
+      "- Vocabulary analysis: " .. (config.get().features.vocabulary and "✓" or "✗"),
+      "- Sentence variety: " .. (config.get().features.sentence_variety and "✓" or "✗"),
       "",
       "---",
       "",
@@ -109,7 +109,7 @@ function M.setup_commands(cfg)
     local bufnr = utils.create_float_window({
       title = "Writing Metrics",
       lines = lines,
-      border = config.config.display.float_border,
+      border = config.get().display.float_border,
     })
 
     vim.bo[bufnr].filetype = "markdown"
@@ -157,7 +157,7 @@ function M.setup_commands(cfg)
     local bufnr = utils.create_float_window({
       title = "Cache Status",
       lines = lines,
-      border = config.config.display.float_border,
+      border = config.get().display.float_border,
     })
 
     vim.bo[bufnr].filetype = "markdown"

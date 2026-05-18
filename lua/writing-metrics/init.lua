@@ -94,7 +94,7 @@ function M.setup(opts)
   -- Register user commands on every setup() call so opts (e.g. enable_legacy)
   -- take effect even when setup() is called multiple times. nvim_create_user_command
   -- overwrites on redefine, so this is safe to call repeatedly.
-  require("writing-metrics.commands").setup_commands(config.config)
+  require("writing-metrics.commands").setup_commands(config.get())
 
   -- One-time side effects (autocmds, validators).
   if M._initialized then
@@ -564,7 +564,7 @@ function M.get_statusline_component()
     if cached then
       -- Format based on config
       local config = get_config()
-      local format = config.config.display.statusline_format
+      local format = config.get().display.statusline_format
 
       if format == "words" then
         return string.format("󰗊 %d", cached.words)

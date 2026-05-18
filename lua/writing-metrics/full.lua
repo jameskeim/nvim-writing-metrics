@@ -128,7 +128,7 @@ function M.show_report(bufnr)
       if not report_visible then
         -- Open the existing report in configured window type
         local config = require("writing-metrics.config")
-        local window_type = config.config.display.report_window
+        local window_type = config.get().display.report_window
 
         if window_type == "tab" then
           vim.cmd("tabnew")
@@ -145,7 +145,7 @@ function M.show_report(bufnr)
     else
       -- Create new report buffer
       local config = require("writing-metrics.config")
-      local window_type = config.config.display.report_window
+      local window_type = config.get().display.report_window
 
       display.create_report_buffer(lines, {
         window_type = window_type,
