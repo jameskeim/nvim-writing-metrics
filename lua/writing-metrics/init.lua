@@ -176,15 +176,6 @@ function M.setup(opts)
     desc = "Invalidate cache after saving",
   })
 
-  vim.api.nvim_create_autocmd("BufDelete", {
-    group = cache_invalidation_group,
-    pattern = writing_patterns,
-    callback = function(ev)
-      cache.invalidate(ev.buf)
-    end,
-    desc = "Clean up cache on buffer deletion",
-  })
-
   -- Setup basic module (statusline integration, moved from plugin/writing-metrics.lua)
   local basic_ok, basic_mod = pcall(require, "writing-metrics.basic")
   if basic_ok then
