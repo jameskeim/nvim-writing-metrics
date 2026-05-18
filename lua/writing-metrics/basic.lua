@@ -288,7 +288,8 @@ function M.show_comparison(bufnr)
   local utils = require("writing-metrics.utils")
 
   -- Get fast count (immediate)
-  local fast_wc = vim.fn.wordcount()
+  local fast_result = M.get_fast_count(bufnr)
+  local fast_wc = { words = fast_result.words or 0, chars = fast_result.chars or 0 }
   local fast_words = fast_wc.words or 0
   local fast_chars = fast_wc.chars or 0
   local total_lines = vim.api.nvim_buf_line_count(bufnr)
@@ -457,6 +458,10 @@ function M.get_statusline_string(bufnr)
   end
 
   -- No cache at all - show fast mode as stale fallback
+  -- Note: vim.fn.wordcount() always reads the current buffer. This branch
+  -- ignores the bufnr parameter; lualine only ever calls us with bufnr=0,
+  -- so the mismatch is latent. If this function is ever called from outside
+  -- lualine, this branch needs the get_fast_count treatment too.
   local wc = vim.fn.wordcount()
   return {
     text = string.format(
