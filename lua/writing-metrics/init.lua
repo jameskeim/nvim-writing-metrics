@@ -142,6 +142,60 @@ function M.setup(opts)
   -- Call setup function
   setup_report_cleanup()
 
+  -- Cache-invalidation autocmds (moved from plugin/writing-metrics.lua).
+  -- These complement cache.setup_autocmds() above — that registers autocmds
+  -- under augroup WritingMetricsCache; these go under augroup WritingMetrics
+  -- and cover the writing-filetype patterns explicitly.
+  local cache_invalidation_group = vim.api.nvim_create_augroup("WritingMetrics", { clear = true })
+  local writing_patterns = { "*.md", "*.txt", "*.tex", "*.fountain", "*.org", "*.asciidoc", "*.rst" }
+
+  vim.api.nvim_create_autocmd({ "TextChanged", "TextChangedI" }, {
+    group = cache_invalidation_group,
+    pattern = writing_patterns,
+    callback = function(ev)
+      cache.invalidate(ev.buf)
+    end,
+    desc = "Invalidate cache on text changes",
+  })
+
+  vim.api.nvim_create_autocmd("InsertLeave", {
+    group = cache_invalidation_group,
+    pattern = writing_patterns,
+    callback = function(ev)
+      cache.invalidate(ev.buf)
+    end,
+    desc = "Invalidate cache after leaving insert mode",
+  })
+
+  vim.api.nvim_create_autocmd("BufWritePost", {
+    group = cache_invalidation_group,
+    pattern = writing_patterns,
+    callback = function(ev)
+      cache.invalidate(ev.buf)
+    end,
+    desc = "Invalidate cache after saving",
+  })
+
+  vim.api.nvim_create_autocmd("BufDelete", {
+    group = cache_invalidation_group,
+    pattern = writing_patterns,
+    callback = function(ev)
+      cache.invalidate(ev.buf)
+    end,
+    desc = "Clean up cache on buffer deletion",
+  })
+
+  -- Setup basic module (statusline integration, moved from plugin/writing-metrics.lua)
+  local basic_ok, basic_mod = pcall(require, "writing-metrics.basic")
+  if basic_ok then
+    basic_mod.setup()
+  end
+
+  -- Mark loaded so plugin/writing-metrics.lua's top-level guard short-circuits
+  -- on subsequent sources (e.g., :Lazy reload). lazy.nvim opts users get this
+  -- flag too, since setup() is their entry point.
+  vim.g.loaded_writing_metrics = 1
+
   M._initialized = true
   return true
 end
