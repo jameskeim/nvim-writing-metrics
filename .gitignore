@@ -15,7 +15,6 @@ tags.temp
 
 # Neovim runtime
 .luarc.json
-.luacheckrc
 
 # Test artifacts
 tests/output/
