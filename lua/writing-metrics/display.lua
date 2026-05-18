@@ -215,7 +215,7 @@ function M.format_basic_section(basic)
   table.insert(lines, string.format("| Paragraphs | **%s** |", utils.format_number(basic.paragraphs)))
   table.insert(lines, string.format("| Lines | **%s** |", utils.format_number(basic.lines)))
   -- Append reading time rows if enabled
-  local rt_config = require("writing-metrics.config").config.reading_time
+  local rt_config = require("writing-metrics.config").get().reading_time
   if rt_config and rt_config.enabled and basic.words and basic.words > 0 then
     local wpm_silent = rt_config.wpm_silent or 200
     local wpm_spoken = rt_config.wpm_spoken or 150

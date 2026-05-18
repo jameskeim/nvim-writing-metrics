@@ -137,7 +137,7 @@ end
 function M.get_reading_time(bufnr)
   bufnr = (bufnr == nil or bufnr == 0) and vim.api.nvim_get_current_buf() or bufnr
 
-  local config = require("writing-metrics.config").config.reading_time
+  local config = require("writing-metrics.config").get().reading_time
   if not config or not config.enabled then
     return nil
   end
@@ -169,7 +169,7 @@ end
 --- Triggers an accurate word count via the standard pipeline; falls
 --- back to vim.fn.wordcount() if the accurate path fails.
 function M.show_reading_time()
-  local config = require("writing-metrics.config").config.reading_time
+  local config = require("writing-metrics.config").get().reading_time
   if not config or not config.enabled then
     vim.notify("Reading time is disabled in config (reading_time.enabled = false)", vim.log.levels.WARN)
     return
@@ -370,7 +370,7 @@ end
 --- @param bufnr integer
 --- @return string
 local function statusline_reading_time_suffix(bufnr)
-  local config = require("writing-metrics.config").config.reading_time
+  local config = require("writing-metrics.config").get().reading_time
   if not config or not config.enabled or not config.statusline then
     return ""
   end
