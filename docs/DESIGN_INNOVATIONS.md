@@ -152,27 +152,6 @@ end
 - Only pay for what you use
 - Modules load in parallel when needed
 
-**Measurement:**
-
-```lua
--- Eager loading
-local start = vim.loop.hrtime()
-local config = require("writing-metrics.config")
-local cache = require("writing-metrics.cache")
-local utils = require("writing-metrics.utils")
-local init = require("writing-metrics")
-local elapsed = (vim.loop.hrtime() - start) / 1e6
-print(string.format("Eager: %.2fms", elapsed))  -- ~15ms
-
--- Lazy loading
-local start = vim.loop.hrtime()
-local init = require("writing-metrics")
-local elapsed = (vim.loop.hrtime() - start) / 1e6
-print(string.format("Lazy: %.2fms", elapsed))   -- ~0.5ms
-```
-
-**30x faster startup!**
-
 ## 5. Backward Compatibility Shims
 
 **Problem:** Existing configurations use global functions like `accurate_wordcount()`.
@@ -192,12 +171,26 @@ require('lualine').setup({
 })
 
 -- Implementation
-_G.accurate_wordcount = function()
-  local bufnr = vim.api.nvim_get_current_buf()
-  local cache = get_cache()
-  local cached = cache.get_basic(bufnr)
-  return cached and cached.words or 0
-end
+_G.accurate_wordcount = setmetatable({
+  get_fast_count         = basic.get_fast_count,
+  get_accurate_count     = basic.get_accurate_count,
+  get_reading_time       = basic.get_reading_time,
+  show_reading_time      = basic.show_reading_time,
+  show_comparison        = basic.show_comparison,
+  toggle_statusline_mode = basic.toggle_statusline_mode,
+  statusline_mode        = basic.statusline_mode,
+  update_lualine_accurate_count = basic.update_statusline_accurate_count,
+}, {
+  __call = function()
+    local bufnr = vim.api.nvim_get_current_buf()
+    local cached = require("writing-metrics.cache").get_basic(bufnr)
+    return (cached and cached.words) or 0
+  end,
+})
+
+-- Two contracts, both preserved:
+--   _G.accurate_wordcount()           → cached word count (original function shape)
+--   _G.accurate_wordcount.<method>()  → basic-module methods (original table shape)
 
 _G.text_metrics = function()
   local bufnr = vim.api.nvim_get_current_buf()

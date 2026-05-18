@@ -1,6 +1,6 @@
 # Core Modules Documentation
 
-This document describes the four core modules that power nvim-writing-metrics.
+This document describes the core modules that power nvim-writing-metrics.
 
 ## Architecture Overview
 
@@ -10,6 +10,7 @@ nvim-writing-metrics/
 │   ├── init.lua       # Main entry point & public API
 │   ├── config.lua     # Configuration & auto-detection
 │   ├── cache.lua      # Intelligent shared caching
+│   ├── commands.lua   # User command registration
 │   └── utils.lua      # Shared utilities
 └── scripts/
     └── textmetrics.lua  # Unified Pandoc filter
@@ -36,10 +37,14 @@ The public API module that provides all user-facing functionality.
 
 **Global Compatibility Shims:**
 
-- `_G.accurate_wordcount()` - Returns word count for current buffer (lualine compatible)
+- `_G.accurate_wordcount` - Callable table with two contracts:
+  - Function form: `_G.accurate_wordcount()` returns the cached word count for the current buffer (original lualine contract from the prior accurate_wordcount.lua plugin)
+  - Table form: `_G.accurate_wordcount.<method>(bufnr)` exposes the basic module's API — `get_fast_count`, `get_accurate_count`, `get_reading_time`, `show_reading_time`, `show_comparison`, `toggle_statusline_mode`, `statusline_mode`, `update_lualine_accurate_count`
 - `_G.text_metrics()` - Returns formatted metrics string (lualine compatible)
 
 **Auto-initialization:** The module auto-initializes on first require if not explicitly setup.
+
+**Command registration:** `setup()` delegates user-command registration to `commands.lua` via `commands.setup_commands(cfg)`. See §5 below for the registered commands and legacy-alias gating.
 
 ### 2. `config.lua` - Configuration & Auto-Detection
 
@@ -61,6 +66,7 @@ The module finds the bundled Pandoc filter using a fallback chain:
 - `M.validate_dependencies()` - Validate both Pandoc and filter
 - `M.get_filter_path()` - Get resolved filter path
 - `M.setup(opts)` - Merge user config with defaults
+- `M.get()` - Return the resolved (post-merge) config table by reference, for other modules to read merged opts without re-merging
 - `M.is_enabled_filetype(ft)` - Check if filetype is enabled
 - `M.get_targets(writing_type)` - Get target ranges for grant/creative/academic
 
@@ -97,8 +103,11 @@ M.defaults = {
     academic = { ... },
   },
   filter = {
-    auto_detect = true,
-    path = nil,  -- Explicit filter path. nil = use auto-detect.
+    auto_detect = true,  -- false: trust filter.path unconditionally (don't fall through to the bundled/XDG/user-bin search even if path is nil or missing)
+    path = nil,          -- Explicit filter path. nil + auto_detect=true → use auto-detect chain.
+  },
+  commands = {
+    enable_legacy = true,  -- Register deprecated alias commands (:AccurateWordCount, :ToggleWordCountMode). false: aliases removed via nvim_del_user_command on setup().
   },
 }
 ```
@@ -194,6 +203,42 @@ Provides utility functions used across all modules.
 - `M.validate_pandoc()` - Check Pandoc availability
 - `M.validate_filter()` - Check filter exists
 
+### 5. `commands.lua` - User Command Registration
+
+Centralizes user-command registration so `init.lua`'s `setup()` stays focused on plugin-lifecycle concerns. Idempotent — `nvim_create_user_command` overwrites on redefine, so re-running `setup()` with different opts (e.g. toggling `enable_legacy`) is safe.
+
+**Key Functions:**
+
+- `M.setup_commands(cfg)` - Register all primary user commands and apply legacy-alias gating. Called once per `setup()` invocation. The `cfg` argument is the resolved config (typically `require("writing-metrics.config").get()`).
+
+**Primary Commands Registered:**
+
+| Command | Description |
+|---------|-------------|
+| `:WordCount` | Show word count (basic metrics). Honors visual range. |
+| `:ReadabilityReport` | Generate comprehensive readability report. Honors visual range. |
+| `:ReadingTime` | Show reading time toast (silent + spoken) |
+| `:WritingMetrics` | Show plugin status and configuration (float) |
+| `:WritingMetricsToggle` | Toggle between fast and accurate statusline mode |
+| `:WritingMetricsCache` | Show cache statistics (float) |
+| `:WritingMetricsClear[!]` | Clear all caches. `!` skips confirmation prompt. |
+
+**Legacy Alias Gating:**
+
+When `cfg.commands.enable_legacy == true` (the default), the following deprecated aliases are also registered:
+
+| Old Command | Forwards To |
+|-------------|-------------|
+| `:AccurateWordCount` | `:WordCount` |
+| `:ToggleWordCountMode` | `:WritingMetricsToggle` |
+
+When `enable_legacy == false`, these aliases are explicitly removed via `nvim_del_user_command` (wrapped in `pcall` since deleting a non-existent command errors). This means flipping `enable_legacy` from `true` to `false` and re-running `setup()` cleanly de-registers the aliases.
+
+**Dependencies:**
+
+- `writing-metrics.config` (read at registration via `cfg`; command callbacks re-read live config via `require()` so config changes take effect without re-running `setup()`)
+- `writing-metrics.basic` / `writing-metrics.full` / `writing-metrics.cache` / `writing-metrics.utils` — required lazily inside command callbacks
+
 ## Design Decisions
 
 ### 1. Lazy Loading
@@ -262,12 +307,26 @@ end
 Global shims ensure existing configurations continue working:
 
 ```lua
-_G.accurate_wordcount = function()
-  local bufnr = vim.api.nvim_get_current_buf()
-  local cache = get_cache()
-  local cached = cache.get_basic(bufnr)
-  return cached and cached.words or 0
-end
+_G.accurate_wordcount = setmetatable({
+  get_fast_count         = basic.get_fast_count,
+  get_accurate_count     = basic.get_accurate_count,
+  get_reading_time       = basic.get_reading_time,
+  show_reading_time      = basic.show_reading_time,
+  show_comparison        = basic.show_comparison,
+  toggle_statusline_mode = basic.toggle_statusline_mode,
+  statusline_mode        = basic.statusline_mode,
+  update_lualine_accurate_count = basic.update_statusline_accurate_count,
+}, {
+  __call = function()
+    local bufnr = vim.api.nvim_get_current_buf()
+    local cached = require("writing-metrics.cache").get_basic(bufnr)
+    return (cached and cached.words) or 0
+  end,
+})
+
+-- Two contracts, both preserved:
+--   _G.accurate_wordcount()           → cached word count (original function shape)
+--   _G.accurate_wordcount.<method>()  → basic-module methods (original table shape)
 ```
 
 ## Testing
@@ -292,7 +351,6 @@ cd ~/projects/nvim-writing-metrics
 - `integration_spec.lua` — end-to-end setup with user opts
 - `utils_spec.lua` — buffer extraction, temp-file lifecycle, Pandoc invocation
 
-A pre-existing failure cluster in `basic_spec.lua` and `full_spec.lua` is tracked separately; the goal for any new work is that the failure count does not increase.
 
 ## Usage Examples
 
@@ -364,19 +422,18 @@ require("writing-metrics").setup({
 - **Memory usage:** ~10KB per cached buffer
 - **Cache cleanup:** Automatic, runs every 5 minutes
 
-## Next Steps
+## Future Work
 
-With core modules complete, the next phases are:
+The plugin is in steady-state maintenance. Known follow-ups, in no particular order:
 
-1. **Track 3: Display Module** - Format and render metrics reports
-2. **Track 4: Commands Module** - User commands and keybindings
-3. **Track 5: Integration** - Lualine, writing modes, existing plugins
-4. **Track 6: Testing** - Comprehensive test suite with plenary.nvim
-5. **Track 7: Documentation** - README, help docs, examples
+1. **Plan J — `tests/` luacheck cleanup.** Close the 3 remaining warnings in `tests/` that were scoped out of Plan H. Brings the whole repo to 0 luacheck warnings.
+2. **Plan K — stylua reconciliation.** Decide whether to keep the deliberate column-aligned comments and live with 7 unrunnable stylua diffs, or run `stylua lua/` and accept the formatting loss. Currently in a deliberate-but-uncommitted state.
+3. **`filter.auto_detect` simplification.** Evaluate whether the `auto_detect=true|false` toggle adds enough value to justify the configuration surface. If auto-detect never fails in practice, the toggle could be retired in favor of "use `filter.path` if set, otherwise auto-detect."
+4. **`:checkhealth writing-metrics` completeness audit.** Verify the health check exercises the full dependency chain — Pandoc version, filter path, autocmd registration, command registration — after Plan F's `setup()` refactor.
 
 ## Module Statistics
 
-- **Total lines (core modules):** ~1,455 across `init.lua`, `config.lua`, `cache.lua`, `utils.lua`
+- **Total lines (core modules):** ~1,590 across `init.lua`, `config.lua`, `cache.lua`, `commands.lua`, `utils.lua`
 - **Average complexity:** Moderate (async operations, caching logic)
 - **Test coverage:** see `tests/*_spec.lua` (run via `./run-tests.sh`)
 - **Dependencies:** Neovim 0.10+, Pandoc 2.19+

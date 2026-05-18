@@ -16,18 +16,18 @@
 │  - show_basic_metrics() / show_full_report()                │
 │  - get_statusline_component()                               │
 │  - Global shims: accurate_wordcount(), text_metrics()       │
-└─────┬───────────────┬──────────────┬────────────────────────┘
-      │               │              │
-      ▼               ▼              ▼
-┌──────────┐   ┌──────────┐   ┌──────────┐
-│ config   │   │  cache   │   │  utils   │
-│          │   │          │   │          │
-│ - Setup  │   │ - Store  │   │ - Pandoc │
-│ - Detect │   │ - Fetch  │   │ - Format │
-│ - Valid  │   │ - Invalid│   │ - Files  │
-└────┬─────┘   └────┬─────┘   └────┬─────┘
-     │              │              │
-     └──────────────┴──────────────┘
+└─────┬───────────────┬──────────────┬───────────────┬────────┘
+      │               │              │               │
+      ▼               ▼              ▼               ▼
+┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐
+│ config   │   │  cache   │   │ commands │   │  utils   │
+│          │   │          │   │          │   │          │
+│ - Setup  │   │ - Store  │   │ - Register│  │ - Pandoc │
+│ - Detect │   │ - Fetch  │   │ - Legacy │   │ - Format │
+│ - Valid  │   │ - Invalid│   │   gating │   │ - Files  │
+└────┬─────┘   └────┬─────┘   └────┬─────┘   └────┬─────┘
+     │              │              │              │
+     └──────────────┴──────────────┴──────────────┘
                     │
                     ▼
         ┌───────────────────────┐
@@ -48,16 +48,12 @@ User opens markdown file
   │     ├─> Check if writing buffer (is_writing_buffer)
   │     │     └─> config.is_enabled_filetype(ft)
   │     │
-  │     ├─> Check basic cache (cache.get_basic)
+  │     ├─> Check basic cache (cache.get_basic via changedtick)
   │     │     │
-  │     │     ├─> Basic cache valid? → Return cached data ✓ (< 0.1ms)
+  │     │     ├─> changedtick matches stored tick? → Return cached data ✓ (< 0.1ms)
   │     │     │
-  │     │     └─> Basic cache expired?
-  │     │           └─> Check full cache (smart optimization!)
-  │     │                 │
-  │     │                 ├─> Full cache valid? → Extract basic metrics ✓
-  │     │                 │
-  │     │                 └─> Both invalid? → Return "..." (trigger background update)
+  │     │     └─> Tick differs (content changed)?
+  │     │           └─> Return last-known data marked stale; trigger background update
   │     │
   │     └─> Format and return string (format_number, icons)
   │
@@ -83,23 +79,14 @@ User presses <leader>mr
   ├─> show_full_report()
   │     │
   │     ├─> get_metrics(bufnr, "full", callback)
-  │     │     │
-  │     │     ├─> Check full cache (cache.get_full)
-  │     │     │     │
-  │     │     │     ├─> Cache valid? → Return immediately ✓
-  │     │     │     │
-  │     │     │     └─> Cache invalid? → Compute fresh
-  │     │     │           │
-  │     │     │           ├─> Get buffer content
-  │     │     │           ├─> Write temp file
-  │     │     │           ├─> Run Pandoc with mode="full"
-  │     │     │           ├─> Parse JSON output
-  │     │     │           └─> Store in cache (cache.set_full)
-  │     │     │                 └─> Also extracts and caches basic metrics!
-  │     │     │
+  │     │     │  (always computes fresh — no full-mode cache)
+  │     │     ├─> Get buffer content (utils.get_buffer_content)
+  │     │     ├─> Write temp file (utils.write_temp_file)
+  │     │     ├─> Run Pandoc with mode="full" (utils.run_pandoc)
+  │     │     ├─> Parse JSON output (utils.parse_full_output)
   │     │     └─> Callback with full metrics data
   │     │
-  │     ├─> Format full report (format_full_report)
+  │     ├─> Render full report (display.format_full_report)
   │     │     ├─> Basic statistics section
   │     │     ├─> Readability scores section
   │     │     ├─> Sentence variety section
@@ -112,6 +99,8 @@ User presses <leader>mr
   │
   └─> User reviews report
 ```
+
+**Why no full-mode cache?** Reports are user-triggered (typically once per editing session, not per redraw) and benefit more from fresh output than from cache reuse. Caching them would risk showing stale readability scores after edits — a worse failure mode than the 200-500ms recomputation cost. See `cache.lua` for the canonical "What's NOT cached" docstring.
 
 ## Cache Optimization Strategy
 
@@ -175,16 +164,20 @@ User types in buffer
 
 ```
 init.lua
-  ├─> Depends on: config, cache, utils
-  └─> Provides: Public API, global shims
+  ├─> Depends on: config, cache, commands, utils, basic
+  └─> Provides: Public API, global shims (callable accurate_wordcount, text_metrics)
 
 config.lua
   ├─> Depends on: (none, standalone)
-  └─> Provides: Configuration, validation, auto-detection
+  └─> Provides: Configuration, validation, auto-detection, M.get() accessor
 
 cache.lua
   ├─> Depends on: (none, reads changedtick via vim.b[bufnr])
   └─> Provides: Changedtick-based caching for basic metrics
+
+commands.lua
+  ├─> Depends on: config (for legacy gating at registration); callbacks lazy-require basic/full/cache/utils
+  └─> Provides: User-command registration (setup_commands)
 
 utils.lua
   ├─> Depends on: config (for filter path)
@@ -258,12 +251,21 @@ First require("writing-metrics")
         │
         ├─> Check if already initialized
         │
-        └─> Call setup() with defaults
+        └─> Call setup() with defaults (idempotent — re-runs reset shims + commands)
               │
               ├─> Load config module
               │     ├─> Merge user opts with defaults
               │     ├─> Validate Pandoc installation
-              │     └─> Auto-detect filter path
+              │     └─> Resolve filter path (auto-detect if filter.auto_detect=true)
+              │
+              ├─> Register global shims
+              │     ├─> _G.accurate_wordcount (callable table, both contracts)
+              │     └─> _G.text_metrics (function)
+              │
+              ├─> Load commands module
+              │     └─> commands.setup_commands(config.get())
+              │            ├─> Register :WordCount, :ReadabilityReport, etc.
+              │            └─> Register or remove legacy aliases per cfg.commands.enable_legacy
               │
               ├─> Load cache module
               │     └─> Setup autocmds for invalidation
