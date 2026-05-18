@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `config.get()` — public accessor on the config module returning the live
+  merged configuration table. Internal modules now route reads through this
+  accessor instead of reading `config.config` directly.
 - Reading time estimation derived from the cached word count, with two
   configurable profiles (silent, default 200 wpm; spoken, default 150 wpm).
   Surfaces in three places:
@@ -56,6 +59,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - CONTRIBUTING guidelines
   - Vim help documentation (doc/writing-metrics.txt)
 - Test suite with plenary.nvim
+
+### Changed
+- `filter.custom_path` config key renamed to `filter.path`. The previous name
+  was undocumented and only appeared inside `config.lua`; users who set
+  `filter.custom_path` via `setup({ filter = { custom_path = ... } })` will
+  silently lose their override after this release and should rename it to
+  `filter.path`. No deprecation shim is provided.
+- `filter.auto_detect = false` now has real semantics. Previously a no-op,
+  it now means "trust `filter.path` even if the file is not readable; do not
+  fall back to the search chain." Combined with `filter.path = nil`, an
+  explicit `auto_detect = false` returns an error from dependency validation
+  (the user opted out of auto-detect but provided no path).
 
 ### Removed
 - `cache.basic_ttl` config option and `cache.is_valid()` function — both
