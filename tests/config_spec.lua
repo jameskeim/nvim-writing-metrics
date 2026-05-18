@@ -39,7 +39,12 @@ describe("writing-metrics.config", function()
     it("has filter configuration", function()
       local defaults = config.get()
 
-      assert.is_string(defaults.filter.path)
+      -- filter.path is nil by default (auto-detect resolves at validate time),
+      -- or a string when the user provides an explicit override.
+      assert.is_true(
+        defaults.filter.path == nil or type(defaults.filter.path) == "string",
+        "filter.path should be nil (use auto-detect) or a string (explicit path)"
+      )
       assert.is_boolean(defaults.filter.auto_detect)
     end)
 

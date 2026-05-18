@@ -65,8 +65,8 @@ M.defaults = {
 
   -- Pandoc filter settings
   filter = {
-    auto_detect = true, -- Automatically find bundled filter
-    custom_path = nil, -- Override with custom path
+    auto_detect = true, -- When true, search the fallback chain if no path is set or if path is unreadable. When false, trust filter.path even if missing (downstream Pandoc surfaces clear errors).
+    path = nil,         -- Explicit filter path. nil = use auto-detect.
   },
 
   -- Command registration
@@ -77,6 +77,13 @@ M.defaults = {
 
 --- Current active configuration (merged with user opts)
 M.config = vim.deepcopy(M.defaults)
+
+--- Get the live merged configuration (defaults + any user opts from setup()).
+--- Returns M.config by reference; callers must not mutate the returned table.
+--- @return table Current active config
+function M.get()
+  return M.config
+end
 
 --- Get the plugin directory by introspecting the source file path
 --- @return string|nil Plugin directory path
@@ -93,13 +100,25 @@ end
 --- @return string|nil Filter path if found
 --- @return string|nil Error message if not found
 function M.find_filter()
-  -- If custom path specified, use it
-  if M.config.filter.custom_path then
-    if vim.fn.filereadable(M.config.filter.custom_path) == 1 then
-      return M.config.filter.custom_path
-    else
-      return nil, "Custom filter path not found: " .. M.config.filter.custom_path
+  -- If an explicit path is specified, use it.
+  -- When auto_detect=false, trust the user even if the file is missing
+  -- (downstream Pandoc invocation will surface a clear error if so).
+  -- When auto_detect=true, validate readability and fall back to the
+  -- candidate search below on miss.
+  if M.config.filter.path then
+    if M.config.filter.auto_detect == false then
+      return M.config.filter.path
     end
+    if vim.fn.filereadable(M.config.filter.path) == 1 then
+      return M.config.filter.path
+    else
+      return nil, "Custom filter path not found: " .. M.config.filter.path
+    end
+  end
+
+  -- If the user opted out of auto-detect but provided no path, that's an error.
+  if M.config.filter.auto_detect == false then
+    return nil, "filter.auto_detect is false but no filter.path was provided"
   end
 
   local candidates = {}
@@ -222,6 +241,11 @@ end
 function M.setup(opts)
   -- Merge user config with defaults
   M.config = vim.tbl_deep_extend("force", M.defaults, opts or {})
+
+  -- Explicitly clear the resolved-filter-path cache so re-configuring takes
+  -- effect even if a future refactor changes the merge to mutate M.config
+  -- in place (instead of replacing it as the line above does).
+  M.config._filter_path = nil
 
   -- Validate dependencies
   local ok, err = M.validate_dependencies()
