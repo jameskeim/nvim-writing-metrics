@@ -21,14 +21,21 @@ describe("backward compatibility", function()
     it("provides _G.accurate_wordcount", function()
       metrics.setup()
 
-      assert.is_function(_G.accurate_wordcount)
+      assert.is_not_nil(_G.accurate_wordcount)
     end)
 
     it("accurate_wordcount is callable", function()
       metrics.setup()
 
-      local status, result = pcall(_G.accurate_wordcount)
-      assert.is_true(status, "accurate_wordcount should be callable")
+      -- accurate_wordcount is a callable table (has __call metamethod) so it
+      -- satisfies both the function-form contract (used by lualine configs)
+      -- and the table-form contract (used as a module API for methods).
+      assert.is_true(
+        type(_G.accurate_wordcount) == "table",
+        "accurate_wordcount should be a table"
+      )
+      local ok = pcall(_G.accurate_wordcount)
+      assert.is_true(ok, "accurate_wordcount should be callable via __call")
     end)
 
     it("provides _G.text_metrics", function()

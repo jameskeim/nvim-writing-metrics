@@ -47,6 +47,50 @@ function M.setup(opts)
   -- can collide with newly-allocated bufnrs or point to wiped buffers.
   _G.writing_metrics_reports = {}
 
+  -- Backward-compatibility globals. Re-establish on every setup() call so
+  -- tests that nil them in before_each can rely on setup() to restore them.
+  -- accurate_wordcount is a callable table: accurate_wordcount() returns the
+  -- current cached word count (the original init.lua function-form contract),
+  -- and accurate_wordcount.<method>(...) gives access to the basic module's
+  -- API (the original basic.lua table-form contract). Both old contracts work.
+  local basic = require("writing-metrics.basic")
+  local cache_mod = require("writing-metrics.cache")
+  local utils = require("writing-metrics.utils")
+
+  local acc_wc = {
+    get_fast_count = basic.get_fast_count,
+    get_accurate_count = basic.get_accurate_count,
+    get_reading_time = basic.get_reading_time,
+    show_reading_time = basic.show_reading_time,
+    show_comparison = basic.show_comparison,
+    toggle_statusline_mode = basic.toggle_statusline_mode,
+    statusline_mode = basic.statusline_mode,
+    update_lualine_accurate_count = basic.update_statusline_accurate_count,
+  }
+  setmetatable(acc_wc, {
+    __call = function()
+      local cached = cache_mod.get_basic(vim.api.nvim_get_current_buf())
+      return (cached and cached.words) or 0
+    end,
+  })
+  _G.accurate_wordcount = acc_wc
+
+  _G.text_metrics = function()
+    local bufnr = vim.api.nvim_get_current_buf()
+    if not M.is_writing_buffer(bufnr) then
+      return ""
+    end
+    local cached = cache_mod.get_basic(bufnr)
+    if cached then
+      return string.format(
+        "󰗊 %s words  󰬶 %s chars",
+        utils.format_number(cached.words),
+        utils.format_number(cached.chars)
+      )
+    end
+    return "󰗊 …"
+  end
+
   -- Register user commands on every setup() call so opts (e.g. enable_legacy)
   -- take effect even when setup() is called multiple times. nvim_create_user_command
   -- overwrites on redefine, so this is safe to call repeatedly.
@@ -498,43 +542,6 @@ end
 function M.clear_all_caches()
   local cache = get_cache()
   cache.clear_all()
-end
-
---- Compatibility shim for accurate_wordcount global function
---- Used by existing lualine configuration
-_G.accurate_wordcount = function()
-  local bufnr = vim.api.nvim_get_current_buf()
-  local cache = get_cache()
-  local cached = cache.get_basic(bufnr)
-
-  if cached then
-    return cached.words or 0
-  end
-
-  return 0
-end
-
---- Compatibility shim for text_metrics global function
-_G.text_metrics = function()
-  local bufnr = vim.api.nvim_get_current_buf()
-
-  if not M.is_writing_buffer(bufnr) then
-    return ""
-  end
-
-  local cache = get_cache()
-  local cached = cache.get_basic(bufnr)
-
-  if cached then
-    local utils = get_utils()
-    return string.format(
-      "󰗊 %s words  󰬶 %s chars",
-      utils.format_number(cached.words),
-      utils.format_number(cached.chars)
-    )
-  end
-
-  return "󰗊 …"
 end
 
 -- Manual testing:

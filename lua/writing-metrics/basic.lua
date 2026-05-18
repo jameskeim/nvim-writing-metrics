@@ -546,23 +546,6 @@ function M.toggle_statusline_mode()
 end
 
 -- ═══════════════════════════════════════════════════════════════
--- BACKWARD COMPATIBILITY
--- ═══════════════════════════════════════════════════════════════
-
---- Global API for backward compatibility with accurate-wordcount.lua
---- This allows existing configs to work without changes
-_G.accurate_wordcount = {
-  get_accurate_count = M.get_accurate_count,
-  get_fast_count = M.get_fast_count,
-  get_reading_time = M.get_reading_time,
-  show_reading_time = M.show_reading_time,
-  show_comparison = M.show_comparison,
-  toggle_statusline_mode = M.toggle_statusline_mode,
-  statusline_mode = M.statusline_mode,
-  update_lualine_accurate_count = M.update_statusline_accurate_count,
-}
-
--- ═══════════════════════════════════════════════════════════════
 -- AUTOCOMMANDS & SETUP
 -- ═══════════════════════════════════════════════════════════════
 
