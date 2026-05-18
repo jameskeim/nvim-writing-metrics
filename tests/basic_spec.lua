@@ -114,7 +114,9 @@ describe("writing-metrics.basic", function()
 
       helpers.wait_for_async(function()
         return result_data ~= nil
-      end, 3000)
+      end, 5000)
+
+      assert.is_not_nil(result_data, "Pandoc callback did not complete within 5000ms")
 
       -- Accurate count should be less than fast count due to markdown stripping
       local fast_result = basic.get_fast_count(bufnr)
