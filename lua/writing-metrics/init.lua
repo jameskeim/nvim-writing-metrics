@@ -50,7 +50,7 @@ function M.setup(opts)
   -- Register user commands on every setup() call so opts (e.g. enable_legacy)
   -- take effect even when setup() is called multiple times. nvim_create_user_command
   -- overwrites on redefine, so this is safe to call repeatedly.
-  require("writing-metrics.commands").setup_commands(get_config().config)
+  require("writing-metrics.commands").setup_commands(config.config)
 
   -- One-time side effects (autocmds, validators).
   if M._initialized then

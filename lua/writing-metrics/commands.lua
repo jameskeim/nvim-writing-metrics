@@ -4,7 +4,10 @@ local M = {}
 
 --- Register all user commands. Idempotent — nvim_create_user_command
 --- overwrites on redefine, so calling twice is safe.
---- @param cfg table Resolved config (e.g. require("writing-metrics.config").config)
+--- @param cfg table Resolved config. Used at registration time to decide
+---   whether to register or de-register the legacy alias commands.
+---   Command callbacks themselves re-read live config via require() for everything
+---   else.
 function M.setup_commands(cfg)
   -- Primary commands
 
@@ -61,13 +64,19 @@ function M.setup_commands(cfg)
       "| `:WritingMetricsCache` | Show cache status and statistics |",
       "| `:WritingMetricsClear` | Clear all caches |",
       "",
-      "## Backward Compatibility",
-      "",
-      "| Old Command | New Command |",
-      "|-------------|-------------|",
-      "| `:AccurateWordCount` | `:WordCount` |",
-      "| `:ToggleWordCountMode` | `:WritingMetricsToggle` |",
-      "",
+    }
+
+    if config.config.commands and config.config.commands.enable_legacy then
+      table.insert(lines, "## Backward Compatibility")
+      table.insert(lines, "")
+      table.insert(lines, "| Old Command | New Command |")
+      table.insert(lines, "|-------------|-------------|")
+      table.insert(lines, "| `:AccurateWordCount` | `:WordCount` |")
+      table.insert(lines, "| `:ToggleWordCountMode` | `:WritingMetricsToggle` |")
+      table.insert(lines, "")
+    end
+
+    vim.list_extend(lines, {
       "## Keybindings (suggested)",
       "",
       "```lua",
@@ -95,7 +104,7 @@ function M.setup_commands(cfg)
       "---",
       "",
       "Press `q` to close | See `:help writing-metrics` for full documentation",
-    }
+    })
 
     local bufnr = utils.create_float_window({
       title = "Writing Metrics",
