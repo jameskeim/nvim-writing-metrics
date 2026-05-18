@@ -92,11 +92,11 @@ M.assert_metrics_structure = function(metrics, mode)
 
     -- Check basic structure
     assert.is_number(metrics.basic.words)
-    assert.is_number(metrics.basic.chars)
+    assert.is_number(metrics.basic.characters)
 
     -- Check readability structure
     assert.is_number(metrics.readability.coleman_liau)
-    assert.is_number(metrics.readability.ari)
+    assert.is_number(metrics.readability.automated_readability)
   end
 end
 
@@ -108,16 +108,21 @@ M.mock_pandoc_full = [[{
   "basic": {
     "words": 100,
     "chars": 500,
+    "characters": 500,
     "sentences": 5,
     "paragraphs": 2,
     "words_per_sentence": 20.0,
-    "words_per_paragraph": 50.0
+    "words_per_paragraph": 50.0,
+    "avg_words_per_sentence": 20.0,
+    "avg_words_per_paragraph": 50.0
   },
   "readability": {
     "coleman_liau": 12.3,
     "ari": 11.8,
+    "automated_readability": 11.8,
     "flesch_reading_ease": 58.4,
     "flesch_kincaid": 10.2,
+    "flesch_kincaid_grade": 10.2,
     "gunning_fog": 13.5,
     "smog": 11.9
   },

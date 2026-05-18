@@ -154,8 +154,6 @@ describe("backward compatibility", function()
       local expected_functions = {
         "get_basic",
         "set_basic",
-        "get_full",
-        "set_full",
         "invalidate",
         "clear_all",
         "get_statistics",

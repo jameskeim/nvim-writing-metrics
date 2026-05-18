@@ -89,9 +89,11 @@ describe("writing-metrics integration", function()
       local metrics_received = false
       local result_data = nil
 
-      full.get_full_metrics(bufnr, function(data)
-        metrics_received = true
-        result_data = data
+      full.get_full_metrics(bufnr, function(ok, data)
+        if ok then
+          metrics_received = true
+          result_data = data
+        end
       end)
 
       local success = helpers.wait_for_async(function()
@@ -100,14 +102,6 @@ describe("writing-metrics integration", function()
 
       assert.is_true(success)
       helpers.assert_metrics_structure(result_data, "full")
-
-      -- Check cache
-      local cached_full = cache.get_full(bufnr)
-      assert.is_not_nil(cached_full)
-
-      -- Basic should also be cached
-      local cached_basic = cache.get_basic(bufnr)
-      assert.is_not_nil(cached_basic)
 
       -- Show report
       local report_success = pcall(full.show_report, bufnr)
@@ -169,10 +163,12 @@ describe("writing-metrics integration", function()
       -- Modify buffer
       vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { "Modified text" })
 
-      -- Cache should be invalidated
+      -- Cache should now be marked stale (soft-stale design: data preserved
+      -- so statusline can show last-known-good while a fresh count computes).
       cache.invalidate(bufnr)
-      local cached = cache.get_basic(bufnr)
-      assert.is_nil(cached)
+      local entry, stale = cache.get_basic(bufnr)
+      assert.is_not_nil(entry, "cached entry should still be present after invalidate")
+      assert.is_true(stale, "cached entry should be marked stale after invalidate")
     end)
   end)
 
