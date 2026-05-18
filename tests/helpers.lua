@@ -107,7 +107,6 @@ M.mock_pandoc_basic = "100 500 5 2"
 M.mock_pandoc_full = [[{
   "basic": {
     "words": 100,
-    "chars": 500,
     "characters": 500,
     "sentences": 5,
     "paragraphs": 2,
@@ -118,7 +117,6 @@ M.mock_pandoc_full = [[{
   },
   "readability": {
     "coleman_liau": 12.3,
-    "ari": 11.8,
     "automated_readability": 11.8,
     "flesch_reading_ease": 58.4,
     "flesch_kincaid": 10.2,

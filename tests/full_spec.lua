@@ -54,7 +54,7 @@ describe("writing-metrics.full", function()
 
       assert.is_table(result.readability)
       assert.is_number(result.readability.coleman_liau)
-      assert.is_number(result.readability.ari)
+      assert.is_number(result.readability.automated_readability)
       assert.is_number(result.readability.flesch_reading_ease)
       assert.is_number(result.readability.flesch_kincaid)
       assert.is_number(result.readability.gunning_fog)
