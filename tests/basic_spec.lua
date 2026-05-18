@@ -173,19 +173,32 @@ describe("writing-metrics.basic", function()
   end)
 
   describe("statusline integration", function()
+    -- get_statusline_string returns either:
+    --   - "" (empty string) for non-writing filetypes
+    --   - { text = "...", color = "..." } table otherwise
+    -- Lualine accepts both shapes natively.
+    local function statusline_text(v)
+      if type(v) == "table" then
+        return v.text
+      end
+      return v
+    end
+
     it("returns statusline string", function()
       local bufnr = helpers.create_test_buffer(helpers.test_documents.simple)
-      local str = basic.get_statusline_string(bufnr)
+      local result = basic.get_statusline_string(bufnr)
 
-      assert.is_string(str)
+      local text = statusline_text(result)
+      assert.is_string(text)
     end)
 
     it("contains word count indicator", function()
       local bufnr = helpers.create_test_buffer(helpers.test_documents.simple)
-      local str = basic.get_statusline_string(bufnr)
+      local result = basic.get_statusline_string(bufnr)
 
+      local text = statusline_text(result)
       -- Should contain either word count text or icon
-      local has_indicator = string.find(str, "words") or string.find(str, "󰗊") or string.find(str, "%d+")
+      local has_indicator = string.find(text, "words") or string.find(text, "󰗊") or string.find(text, "%d+")
       assert.is_true(has_indicator ~= nil)
     end)
 
@@ -209,15 +222,15 @@ describe("writing-metrics.basic", function()
 
       -- Get string in fast mode
       basic.statusline_mode = "fast"
-      local fast_str = basic.get_statusline_string(bufnr)
+      local fast_result = basic.get_statusline_string(bufnr)
 
       -- Get string in accurate mode
       basic.statusline_mode = "accurate"
-      local accurate_str = basic.get_statusline_string(bufnr)
+      local accurate_result = basic.get_statusline_string(bufnr)
 
       -- Strings should be different (one uses cache, one triggers accurate)
-      assert.is_string(fast_str)
-      assert.is_string(accurate_str)
+      assert.is_string(statusline_text(fast_result))
+      assert.is_string(statusline_text(accurate_result))
     end)
   end)
 
