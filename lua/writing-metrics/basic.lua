@@ -81,7 +81,10 @@ function M.get_accurate_count(bufnr, callback)
   end)
 end
 
---- Get fast count using Vim's native wordcount()
+--- Get fast count using direct buffer text scan.
+--- Reads the passed buffer (defaults to current); does NOT rely on
+--- vim.fn.wordcount(), which always operates on the current buffer
+--- regardless of arguments.
 --- @param bufnr number|nil Buffer number (0 or nil for current)
 --- @return table Basic metrics {words, chars, sentences, paragraphs}
 function M.get_fast_count(bufnr)
@@ -90,12 +93,34 @@ function M.get_fast_count(bufnr)
     bufnr = vim.api.nvim_get_current_buf()
   end
 
-  local wc = vim.fn.wordcount()
+  if not vim.api.nvim_buf_is_valid(bufnr) then
+    return {
+      words = 0,
+      chars = 0,
+      sentences = 0,
+      paragraphs = 0,
+      avg_sentence_len = 0,
+      avg_word_len = 0,
+    }
+  end
+
+  local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+  local words, chars = 0, 0
+  for _, line in ipairs(lines) do
+    for _ in line:gmatch("%S+") do
+      words = words + 1
+    end
+    chars = chars + vim.fn.strchars(line)
+  end
+  -- Count the newline between each pair of lines (matches vim.fn.wordcount).
+  if #lines > 1 then
+    chars = chars + (#lines - 1)
+  end
 
   return {
-    words = wc.words or 0,
-    chars = wc.chars or 0,
-    sentences = 0, -- Vim doesn't count these
+    words = words,
+    chars = chars,
+    sentences = 0, -- This function never counted sentences.
     paragraphs = 0,
     avg_sentence_len = 0,
     avg_word_len = 0,
