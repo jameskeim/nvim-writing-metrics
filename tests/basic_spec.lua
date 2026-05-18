@@ -258,8 +258,8 @@ describe("writing-metrics.basic", function()
     it("component has required fields", function()
       local component = basic.lualine_component()
 
-      -- Should be callable or have function field
-      assert.is_true(type(component) == "function" or type(component.update) == "function")
+      -- Lualine's documented format: { render_fn, cond = ..., color = ... }
+      assert.is_function(component[1])
     end)
   end)
 
